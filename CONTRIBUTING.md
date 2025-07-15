@@ -30,6 +30,8 @@ To save ourselves some headaches later, we should begin by following good practi
 
 We'll try using the [Black code style](https://black.readthedocs.io/en/stable/the_black_code_style/current_style.html).
 
+You can [set Black as your default formatter in VSCode](https://code.visualstudio.com/docs/python/formatting).
+
 ### Unit Testing
 
 We'll use the [`unittest`](https://docs.python.org/3/library/unittest.html) module as our testing framework. Tests live in the `/tests` directory. Unit tests should run before every PR. Some quick AI-drafted tips:
