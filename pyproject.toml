@@ -5,5 +5,8 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "black>=25.1.0",
+    "numpydoc>=1.9.0",
     "qutip>=5.2.0",
+    "sphinx>=8.2.3",
 ]
