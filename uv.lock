@@ -52,6 +52,7 @@ dependencies = [
     { name = "black" },
     { name = "numpydoc" },
     { name = "qutip" },
+    { name = "requests" },
     { name = "sphinx" },
 ]
 
@@ -60,6 +61,7 @@ requires-dist = [
     { name = "black", specifier = ">=25.1.0" },
     { name = "numpydoc", specifier = ">=1.9.0" },
     { name = "qutip", specifier = ">=5.2.0" },
+    { name = "requests", specifier = ">=2.32.4" },
     { name = "sphinx", specifier = ">=8.2.3" },
 ]
 
