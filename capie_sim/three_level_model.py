@@ -139,7 +139,7 @@ def run_sim(
 
 times, n_pop, g_pop, e_pop, s_pop = run_sim()
 plt.plot(times, n_pop, label="photon numbers")
-plt.plot(times, g_pop, label=" |e> pop")
+plt.plot(times, g_pop, label="|e⟩ pop")
 plt.plot(times, e_pop, label="|g⟩ pop")
 plt.plot(times, s_pop, label="|s⟩ pop")
 plt.plot(times, g_pop + e_pop + s_pop, label="total pop")
@@ -175,7 +175,7 @@ def sweep_kappa(
     Returns
     -------
     tuple of lists
-        Populations in |g>, |e>, |s> and photon number over all kappa values.
+        Populations in |g⟩, |e⟩, |s⟩ and photon number over all kappa values.
     """
     g = basis(3, 0)
     e = basis(3, 1)
@@ -236,7 +236,7 @@ def sweep_gamma(
     Returns
     -------
     tuple of lists
-        Populations in |g>, |e>, |s> and photon number over all gamma values.
+        Populations in |g⟩, |e⟩, |s⟩ and photon number over all gamma values.
     """
     g = basis(3, 0)
     e = basis(3, 1)
@@ -272,16 +272,16 @@ def sweep_gamma(
 kap_vals, kap_g, kap_e, kap_s, kap_photon = sweep_kappa(0.01, 1, 100)
 gam_vals, gam_g, gam_e, gam_s, gam_photon = sweep_gamma(0.01, 1, 100)
 
-plt.plot(kap_vals, kap_g, label="|g> population")
-plt.plot(kap_vals, kap_e, label="|e> poopulation")
-plt.plot(kap_vals, kap_s, label="|s> population")
+plt.plot(kap_vals, kap_g, label="|g⟩ population")
+plt.plot(kap_vals, kap_e, label="|e⟩ population")
+plt.plot(kap_vals, kap_s, label="|s⟩ population")
 plt.plot(kap_vals, kap_photon, label="Photon population")
 plt.legend()
 plt.show()
 
-plt.plot(gam_vals, gam_g, label="|g> population")
-plt.plot(gam_vals, gam_e, label="|e> poopulation")
-plt.plot(gam_vals, gam_s, label="|s> population")
+plt.plot(gam_vals, gam_g, label="|g⟩ population")
+plt.plot(gam_vals, gam_e, label="|e⟩ population")
+plt.plot(gam_vals, gam_s, label="|s⟩ population")
 plt.plot(gam_vals, gam_photon, label="Photon population")
 plt.legend()
 plt.show()
