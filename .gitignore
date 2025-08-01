@@ -208,3 +208,8 @@ __marimo__/
 
 # Mac stuff
 **/.DS_Store
+
+# Quarto
+**/*.html
+**/*.pdf
+**/*_files
