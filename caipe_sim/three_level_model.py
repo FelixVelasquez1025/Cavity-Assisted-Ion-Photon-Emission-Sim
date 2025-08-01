@@ -138,10 +138,10 @@ def run_sim(
 
 
 times, n_pop, g_pop, e_pop, s_pop = run_sim()
-plt.plot(times, n_pop, label="photon numbers")
-plt.plot(times, g_pop, label=" |e> pop")
-plt.plot(times, e_pop, label="|g⟩ pop")
-plt.plot(times, s_pop, label="|s⟩ pop")
-plt.plot(times, g_pop + e_pop + s_pop, label="total pop")
+plt.plot(times, n_pop, label="Photon numbers")
+plt.plot(times, g_pop, label="|e⟩ population")
+plt.plot(times, e_pop, label="|g⟩ population")
+plt.plot(times, s_pop, label="|s⟩ population")
+plt.plot(times, g_pop + e_pop + s_pop, label="Total population")
 plt.legend()
 plt.show()
