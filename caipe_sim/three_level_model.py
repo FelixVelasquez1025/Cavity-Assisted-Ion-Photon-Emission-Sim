@@ -258,7 +258,9 @@ def sweep_gamma(
     )
 
     pg, pe, ps, photons = [], [], [], []
+
     gamma_values = np.linspace(gamma_values_start, gamma_values_end, gamma_values_steps)
+
     for gamma in gamma_values:
         c_ops = [np.sqrt(kappa) * a, np.sqrt(gamma) * sigma_ge]
         rho_ss = steadystate(H, c_ops)
@@ -269,13 +271,177 @@ def sweep_gamma(
     return gamma_values, pg, pe, ps, photons
 
 
+# Atomic Transitions
+
+def define_basis_operators(Ncav=4):
+    """
+    Defines the key operators for a three-level atom coupled to an optical cavity.
+
+    Parameters
+    ----------
+    Ncav : int, optional
+        maximum amount of photons in optical cavity, default = 4
+
+    Returns
+    -------
+    tuple
+        - sigma_ge : Qobj
+            Lowering operator from |e⟩ to |g⟩.
+        - sigma_se : Qobj
+            Lowering operator from |e⟩ to |s⟩.
+        - a : Qobj
+            Cavity annihilation operator.
+        - P_g : Qobj
+            Projector onto the ground state |g⟩.
+        - P_s : Qobj
+            Projector onto the metastable state |s⟩.
+        - P_e : Qobj
+            Projector onto the excited state |e⟩.
+    """  
+    g = basis(3, 0)
+    e = basis(3, 1)
+    s = basis(3, 2)
+
+    sigma_ge = tensor(qeye(Ncav), g * e.dag())
+    sigma_se = tensor(qeye(Ncav), s * e.dag())
+    a = tensor(destroy(Ncav), qeye(3))
+
+    P_g = tensor(qeye(Ncav), g * g.dag())
+    P_s = tensor(qeye(Ncav), s * s.dag())
+    P_e = tensor(qeye(Ncav), e * e.dag())
+
+    return sigma_ge, sigma_se, a, P_g, P_s, P_e
+
+
+def sweep_rabi(
+    rabi_vals_start,
+    rabi_vals_end,
+    rabi_vals_step,
+    gamma=0.05,
+    Ncav=4,
+    detune_c=1.0,
+    detune_l=1.0,
+    g_val=1.0,
+    kappa=0.2,
+):
+    """
+    Sweep over different Rabi frequencies, gives the laser strength, and compute steady-state observables.
+
+    Parameters
+    ----------
+    rabi_vals_start : float
+        Starting value of the Rabi frequency to sweep.
+    rabi_vals_end : float
+        Final value of the Rabi frequency to sweep.
+    rabi_vals_step : int
+        Number of Rabi frequency steps to evaluate.
+
+    Returns
+    -------
+    tuple of lists
+        - rabi_values : list
+            Rabi frequencies swept.
+        - pg : list
+            Population in state |g⟩ for each Rabi frequency.
+        - pe : list
+            Population in state |e⟩ for each Rabi frequency.
+        - ps : list
+            Population in state |s⟩ for each Rabi frequency.
+        - photons : list
+            Mean photon number ⟨a†a⟩ for each Rabi frequency.
+    """
+
+    rabi_values = np.linspace(rabi_vals_start, rabi_vals_end, rabi_vals_step)
+    sigma_ge, sigma_se, a, P_g, P_s, P_e = define_basis_operators(Ncav)
+    pg, pe, ps, photons = [], [], [], []
+
+    for rabi in rabi_values:
+        H = (
+            detune_c * a.dag() * a
+            + detune_l * sigma_se.dag() * sigma_se
+            + g_val * (a.dag() * sigma_ge + a * sigma_ge.dag())
+            + rabi * (sigma_se + sigma_se.dag())
+        )
+
+        c_ops = [np.sqrt(kappa) * a, np.sqrt(gamma) * sigma_ge]
+        rho_ss = steadystate(H, c_ops)
+        pg.append(expect(P_g, rho_ss))
+        pe.append(expect(P_e, rho_ss))
+        ps.append(expect(P_s, rho_ss))
+        photons.append(expect(a.dag() * a, rho_ss))
+    return rabi_values, pg, pe, ps, photons
+
+
+def sweep_gval(
+    gval_vals_start,
+    gval_vals_end,
+    gval_vals_step,
+    gamma=0.05,
+    Ncav=4,
+    detune_c=1.0,
+    detune_l=1.0,
+    kappa=0.2,
+    rabi=2.0,
+):
+    """
+    Sweep over different atom-cavity coupling strengths (g) and compute steady-state observables.
+
+    Parameters
+    ----------
+    gval_vals_start : float
+        Starting value of g to sweep.
+    gval_vals_end : float
+        Final value of g to sweep.
+    gval_vals_step : int
+        Number of g values to evaluate.
+
+    Returns
+    -------
+    tuple of lists
+        - gval_values : list
+            Coupling strengths swept.
+        - pg : list
+            Population in state |g⟩ for each g value.
+        - pe : list
+            Population in state |e⟩ for each g value.
+        - ps : list
+            Population in state |s⟩ for each g value.
+        - photons : list
+            Mean photon number ⟨a†a⟩ for each g value.
+    """
+
+    gval_values = np.linspace(gval_vals_start, gval_vals_end, gval_vals_step)
+    sigma_ge, sigma_se, a, P_g, P_s, P_e = define_basis_operators(Ncav)
+    pg, pe, ps, photons = [], [], [], []
+
+    for gval_value in gval_values:
+        H = (
+            detune_c * a.dag() * a
+            + detune_l * sigma_se.dag() * sigma_se
+            + gval_value * (a.dag() * sigma_ge + a * sigma_ge.dag())
+            + rabi * (sigma_se + sigma_se.dag())
+        )
+
+        c_ops = [np.sqrt(kappa) * a, np.sqrt(gamma) * sigma_ge]
+        rho_ss = steadystate(H, c_ops)
+        pg.append(expect(P_g, rho_ss))
+        pe.append(expect(P_e, rho_ss))
+        ps.append(expect(P_s, rho_ss))
+        photons.append(expect(a.dag() * a, rho_ss))
+    return gval_values, pg, pe, ps, photons
+
+
 kap_vals, kap_g, kap_e, kap_s, kap_photon = sweep_kappa(0.01, 1, 100)
 gam_vals, gam_g, gam_e, gam_s, gam_photon = sweep_gamma(0.01, 1, 100)
+rabi_vals, rabi_g, rabi_e, rabi_s, rabi_photon = sweep_rabi(0.01, 1, 100)
+gval_vals, gval_g, gval_e, gval_s, gval_photon = sweep_gval(0.01, 1, 100)
+
 
 plt.plot(kap_vals, kap_g, label="|g> population")
 plt.plot(kap_vals, kap_e, label="|e> poopulation")
 plt.plot(kap_vals, kap_s, label="|s> population")
 plt.plot(kap_vals, kap_photon, label="Photon population")
+plt.title("Kappa sweep")
 plt.legend()
 plt.show()
 
@@ -283,5 +449,22 @@ plt.plot(gam_vals, gam_g, label="|g> population")
 plt.plot(gam_vals, gam_e, label="|e> poopulation")
 plt.plot(gam_vals, gam_s, label="|s> population")
 plt.plot(gam_vals, gam_photon, label="Photon population")
+plt.title("Gamma sweep")
+plt.legend()
+plt.show()
+
+
+plt.plot(rabi_vals, rabi_g, label="|g> population")
+plt.plot(rabi_vals, rabi_e, label="|e> population")
+plt.plot(rabi_vals, rabi_s, label="|s> population")
+plt.plot(rabi_vals, rabi_photon, label="Photon population")
+plt.title("Rabi sweep")
+plt.show()
+
+plt.plot(gval_vals, gval_g, label="|g> population")
+plt.plot(gval_vals, gval_e, label="|e> poopulation")
+plt.plot(gval_vals, gval_s, label="|s> population")
+plt.plot(gval_vals, gval_photon, label="Photon population")
+plt.title("g-val sweep")
 plt.legend()
 plt.show()
