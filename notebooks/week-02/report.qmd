@@ -1,0 +1,54 @@
+---
+title: Example Report
+date: 2025-08-01
+date-format: "D MMMM YYYY"
+
+format:
+  html: default
+  pdf: default
+---
+
+## Introduction
+
+This is a skeleton report showing how they can be written.
+
+To render this report, from the project root directory run:
+
+```{bash}
+quarto render notebooks/week-02/report.qmd
+```
+
+For a live preview that updates as you make edits, run:
+
+```{bash}
+quarto preview notebooks/week-02/report.qmd
+```
+
+See the [quarto website](https://quarto.org) for more information.
+
+```{python}
+#| code-fold: true
+#| code-summary: Dependencies
+from caipe_sim.three_level_model import run_sim
+import matplotlib.pyplot as plt
+import numpy as np
+```
+
+## Run default simulation
+
+```{python}
+%%time
+times, n_pop, g_pop, e_pop, s_pop = run_sim()
+```
+
+## Plot simulation
+
+```{python}
+plt.plot(times, n_pop, label="Photon numbers")
+plt.plot(times, g_pop, label="|e⟩ population")
+plt.plot(times, e_pop, label="|g⟩ population")
+plt.plot(times, s_pop, label="|s⟩ population")
+plt.plot(times, g_pop + e_pop + s_pop, label="Total population")
+plt.legend()
+plt.show()
+```
