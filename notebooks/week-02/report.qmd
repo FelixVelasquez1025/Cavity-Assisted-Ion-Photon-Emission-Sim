@@ -52,3 +52,75 @@ plt.plot(times, g_pop + e_pop + s_pop, label="Total population")
 plt.legend()
 plt.show()
 ```
+
+## Parameter sweeps
+
+### $\kappa$ sweep
+
+```{python}
+%%time
+from caipe_sim.three_level_model import sweep_kappa
+kap_vals, kap_g, kap_e, kap_s, kap_photon = sweep_kappa(0.01, 1, 100)
+```
+
+```{python}
+plt.plot(kap_vals, kap_g, label="|g⟩ population")
+plt.plot(kap_vals, kap_e, label="|e⟩ population")
+plt.plot(kap_vals, kap_s, label="|s⟩ population")
+plt.plot(kap_vals, kap_photon, label="Photon population")
+plt.title("Kappa sweep")
+plt.legend()
+plt.show()
+```
+
+### $\gamma$ sweep
+
+```{python}
+%%time
+from caipe_sim.three_level_model import sweep_gamma
+gam_vals, gam_g, gam_e, gam_s, gam_photon = sweep_gamma(0.01, 1, 100)
+```
+
+```{python}
+plt.plot(gam_vals, gam_g, label="|g⟩ population")
+plt.plot(gam_vals, gam_e, label="|e⟩ population")
+plt.plot(gam_vals, gam_s, label="|s⟩ population")
+plt.plot(gam_vals, gam_photon, label="Photon population")
+plt.title("Gamma sweep")
+plt.legend()
+plt.show()
+```
+
+### Rabi sweep
+
+```{python}
+from caipe_sim.three_level_model import sweep_rabi
+rabi_vals, rabi_g, rabi_e, rabi_s, rabi_photon = sweep_rabi(0.01, 1, 100)
+```
+
+```{python}
+plt.plot(rabi_vals, rabi_g, label="|g⟩ population")
+plt.plot(rabi_vals, rabi_e, label="|e⟩ population")
+plt.plot(rabi_vals, rabi_s, label="|s⟩ population")
+plt.plot(rabi_vals, rabi_photon, label="Photon population")
+plt.title("Rabi sweep")
+plt.show()
+```
+
+### $g$ sweep
+
+```{python}
+%%time
+from caipe_sim.three_level_model import sweep_gval
+gval_vals, gval_g, gval_e, gval_s, gval_photon = sweep_gval(0.01, 1, 100)
+```
+
+```{python}
+plt.plot(gval_vals, gval_g, label="|g⟩ population")
+plt.plot(gval_vals, gval_e, label="|e⟩ poopulation")
+plt.plot(gval_vals, gval_s, label="|s⟩ population")
+plt.plot(gval_vals, gval_photon, label="Photon population")
+plt.title("g-val sweep")
+plt.legend()
+plt.show()
+```
