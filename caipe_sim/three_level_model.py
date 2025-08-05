@@ -468,3 +468,16 @@ plt.plot(gval_vals, gval_photon, label="Photon population")
 plt.title("g-val sweep")
 plt.legend()
 plt.show()
+def H_op_default(
+        sigma_ge, 
+        sigma_se,
+        a,
+        const
+        ):
+    
+    H = (
+    const["detune_c"] * a.dag() * a
+    + const["detune_l"] * sigma_se.dag() * sigma_se
+    + const["gval"] * (a.dag() * sigma_ge + a * sigma_ge.dag())
+    + const["rabi"] * (sigma_se + sigma_se.dag())
+    )
