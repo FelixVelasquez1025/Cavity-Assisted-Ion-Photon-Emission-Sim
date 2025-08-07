@@ -16,6 +16,7 @@ To render this report, from the project root directory run:
 
 ```{bash}
 quarto render notebooks/week-02/report.qmd
+
 ```
 
 For a live preview that updates as you make edits, run:
@@ -29,6 +30,9 @@ See the [quarto website](https://quarto.org) for more information.
 ```{python}
 #| code-fold: true
 #| code-summary: Dependencies
+import sys, os
+sys.path.append(os.path.abspath(os.path.join(os.getcwd(), "..", "..")))
+
 from caipe_sim.three_level_model import run_sim
 import matplotlib.pyplot as plt
 import numpy as np
