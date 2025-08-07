@@ -475,7 +475,27 @@ def H_op_default(
         a,
         const
         ):
-   return (
+    """
+    Construct the default Hamiltonian for the three-level atom-cavity system.
+
+    Parameters
+    ----------
+    sigma_ge : Qobj
+        Lowering operator from |e⟩ to |g⟩.
+    sigma_se : Qobj
+        Lowering operator from |e⟩ to |s⟩.
+    a : Qobj
+        Cavity annihilation operator.
+    const : dict
+        Dictionary containing constant parameters:
+        'detune_c', 'detune_l', 'gval', and 'rabi'.
+
+    Returns
+    -------
+    Qobj
+        The Hamiltonian operator. 
+    """
+    return (
     const["detune_c"] * a.dag() * a
     + const["detune_l"] * sigma_se.dag() * sigma_se
     + const["gval"] * (a.dag() * sigma_ge + a * sigma_ge.dag())
@@ -483,6 +503,19 @@ def H_op_default(
     )
 
 def H_op_g(g,sigma_ge,sigma_se,a,const):
+    """
+    Construct the Hamiltonian with a variable atom-cavity coupling strength g.
+
+    Parameters
+    ----------
+    g : float
+        Coupling strength to sweep.
+
+    Returns
+    -------
+    Qobj
+        The Hamiltonian operator.
+    """
     return (
     const["detune_c"] * a.dag() * a
     + const["detune_l"] * sigma_se.dag() * sigma_se
@@ -491,6 +524,18 @@ def H_op_g(g,sigma_ge,sigma_se,a,const):
     )
 
 def H_op_rabi(rabi,sigma_ge,sigma_se,a,const):
+    """
+    Construct the Hamiltonian with a variable laser Rabi frequency.
+
+    Parameters
+    ----------
+    rabi : float
+        Rabi frequency to sweep.
+    Returns
+    -------
+    Qobj
+        The Hamiltonian operator.
+    """
     return (
     const["detune_c"] * a.dag() * a
     + const["detune_l"] * sigma_se.dag() * sigma_se
@@ -500,6 +545,34 @@ def H_op_rabi(rabi,sigma_ge,sigma_se,a,const):
 
 
 def sweep_parameters(parameter, parameter_range, constants):
+    """
+    Sweep a given system parameter and compute steady-state observables.
+
+    Parameters
+    ----------
+    parameter : str
+        Name of the parameter to sweep. Must be one of:
+        'gval', 'rabi', 'kappa', or 'gamma'.
+    parameter_range : array-like
+        Range of values for the chosen parameter.
+    constants : dict
+        Dictionary of constant system parameters, including:
+        'gamma', 'kappa', 'rabi', 'gval', 'detune_c', 'detune_l', 'Ncav'.
+
+    Returns
+    -------
+    tuple
+        - parameter_range : np.ndarray
+            Values of the swept parameter.
+        - pg : list of float
+            Population in ground state |g⟩.
+        - pe : list of float
+            Population in excited state |e⟩.
+        - ps : list of float
+            Population in shelving state |s⟩.
+        - photons : list of float
+            Mean photon number ⟨a†a⟩ in the cavity.
+"""
     sigma_ge, sigma_se, a, P_g, P_s, P_e = define_basis_operators(constants["Ncav"])
     pg, pe, ps, photons = [], [], [], []
 
