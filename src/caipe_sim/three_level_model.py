@@ -177,76 +177,19 @@ def define_basis_operators(Ncav=4):
     return sigma_ge, sigma_se, a, P_g, P_s, P_e
 
 
-def H_op_default(sigma_ge, sigma_se, a, const):
+def H_op(sigma_ge, sigma_se, a, const):
     """
-    Construct the default Hamiltonian for the three-level atom-cavity system.
+    Construct the Hamiltonian for the three-level atom-cavity system given environment constants.
 
-    Parameters
-    ----------
-    sigma_ge : Qobj
-        Lowering operator from |e⟩ to |g⟩.
-    sigma_se : Qobj
-        Lowering operator from |e⟩ to |s⟩.
-    a : Qobj
-        Cavity annihilation operator.
-    const : dict
-        Dictionary containing constant parameters:
-        'detune_c', 'detune_l', 'gval', and 'rabi'.
-
-    Returns
-    -------
-    Qobj
-        The Hamiltonian operator.
+    TBD
     """
-    return (
+    H = (
         const["detune_c"] * a.dag() * a
         + const["detune_l"] * sigma_se.dag() * sigma_se
         + const["gval"] * (a.dag() * sigma_ge + a * sigma_ge.dag())
         + const["rabi"] * (sigma_se + sigma_se.dag())
     )
-
-
-def H_op_g(g, sigma_ge, sigma_se, a, const):
-    """
-    Construct the Hamiltonian with a variable atom-cavity coupling strength g.
-
-    Parameters
-    ----------
-    g : float
-        Coupling strength to sweep.
-
-    Returns
-    -------
-    Qobj
-        The Hamiltonian operator.
-    """
-    return (
-        const["detune_c"] * a.dag() * a
-        + const["detune_l"] * sigma_se.dag() * sigma_se
-        + g * (a.dag() * sigma_ge + a * sigma_ge.dag())
-        + const["rabi"] * (sigma_se + sigma_se.dag())
-    )
-
-
-def H_op_rabi(rabi, sigma_ge, sigma_se, a, const):
-    """
-    Construct the Hamiltonian with a variable laser Rabi frequency.
-
-    Parameters
-    ----------
-    rabi : float
-        Rabi frequency to sweep.
-    Returns
-    -------
-    Qobj
-        The Hamiltonian operator.
-    """
-    return (
-        const["detune_c"] * a.dag() * a
-        + const["detune_l"] * sigma_se.dag() * sigma_se
-        + const["gval"] * (a.dag() * sigma_ge + a * sigma_ge.dag())
-        + rabi * (sigma_se + sigma_se.dag())
-    )
+    return H
 
 
 def sweep_parameters(parameter, parameter_range, constants):
@@ -281,20 +224,9 @@ def sweep_parameters(parameter, parameter_range, constants):
     sigma_ge, sigma_se, a, P_g, P_s, P_e = define_basis_operators(constants["Ncav"])
     pg, pe, ps, photons = [], [], [], []
 
-    # finds correct hamiltonian
-    if parameter == "g":
-        H_func = lambda val, constants: H_op_g(val, sigma_ge, sigma_se, a, constants)
-    elif parameter == "rabi":
-        H_func = lambda val, constants: H_op_rabi(val, sigma_ge, sigma_se, a, constants)
-    else:
-        H_func = lambda _, constants: H_op_default(sigma_ge, sigma_se, a, constants)
-
     for value in parameter_range:
-        # for kappa and gamma updates the values for these parameters
-        temp_const = constants.copy()
-        temp_const[parameter] = value
-
-        H = H_func(value, temp_const)
+        constants[parameter] = value  # update sweep parameter
+        H = H_op(sigma_ge, sigma_se, a, constants)  # update Hamiltonian
 
         c_ops = [
             np.sqrt(temp_const["kappa"]) * a,
@@ -307,7 +239,7 @@ def sweep_parameters(parameter, parameter_range, constants):
         ps.append(expect(P_s, rho_ss))
         photons.append(expect(a.dag() * a, rho_ss))
 
-    return parameter_range, pg, pe, ps, photons
+    return pg, pe, ps, photons
 
 
 if __name__ == "__main__":
