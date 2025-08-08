@@ -161,7 +161,7 @@ def define_basis_operators(Ncav=4):
             Projector onto the metastable state |s⟩.
         - P_e : Qobj
             Projector onto the excited state |e⟩.
-    """  
+    """
     g = basis(3, 0)
     e = basis(3, 1)
     s = basis(3, 2)
@@ -177,12 +177,7 @@ def define_basis_operators(Ncav=4):
     return sigma_ge, sigma_se, a, P_g, P_s, P_e
 
 
-def H_op_default(
-        sigma_ge, 
-        sigma_se,
-        a,
-        const
-        ):
+def H_op_default(sigma_ge, sigma_se, a, const):
     """
     Construct the default Hamiltonian for the three-level atom-cavity system.
 
@@ -201,16 +196,17 @@ def H_op_default(
     Returns
     -------
     Qobj
-        The Hamiltonian operator. 
+        The Hamiltonian operator.
     """
     return (
-    const["detune_c"] * a.dag() * a
-    + const["detune_l"] * sigma_se.dag() * sigma_se
-    + const["gval"] * (a.dag() * sigma_ge + a * sigma_ge.dag())
-    + const["rabi"] * (sigma_se + sigma_se.dag())
+        const["detune_c"] * a.dag() * a
+        + const["detune_l"] * sigma_se.dag() * sigma_se
+        + const["gval"] * (a.dag() * sigma_ge + a * sigma_ge.dag())
+        + const["rabi"] * (sigma_se + sigma_se.dag())
     )
 
-def H_op_g(g,sigma_ge,sigma_se,a,const):
+
+def H_op_g(g, sigma_ge, sigma_se, a, const):
     """
     Construct the Hamiltonian with a variable atom-cavity coupling strength g.
 
@@ -225,13 +221,14 @@ def H_op_g(g,sigma_ge,sigma_se,a,const):
         The Hamiltonian operator.
     """
     return (
-    const["detune_c"] * a.dag() * a
-    + const["detune_l"] * sigma_se.dag() * sigma_se
-    + g * (a.dag() * sigma_ge + a * sigma_ge.dag())
-    + const["rabi"] * (sigma_se + sigma_se.dag())
+        const["detune_c"] * a.dag() * a
+        + const["detune_l"] * sigma_se.dag() * sigma_se
+        + g * (a.dag() * sigma_ge + a * sigma_ge.dag())
+        + const["rabi"] * (sigma_se + sigma_se.dag())
     )
 
-def H_op_rabi(rabi,sigma_ge,sigma_se,a,const):
+
+def H_op_rabi(rabi, sigma_ge, sigma_se, a, const):
     """
     Construct the Hamiltonian with a variable laser Rabi frequency.
 
@@ -245,10 +242,10 @@ def H_op_rabi(rabi,sigma_ge,sigma_se,a,const):
         The Hamiltonian operator.
     """
     return (
-    const["detune_c"] * a.dag() * a
-    + const["detune_l"] * sigma_se.dag() * sigma_se
-    + const["gval"] * (a.dag() * sigma_ge + a * sigma_ge.dag())
-    + rabi * (sigma_se + sigma_se.dag())
+        const["detune_c"] * a.dag() * a
+        + const["detune_l"] * sigma_se.dag() * sigma_se
+        + const["gval"] * (a.dag() * sigma_ge + a * sigma_ge.dag())
+        + rabi * (sigma_se + sigma_se.dag())
     )
 
 
@@ -280,38 +277,37 @@ def sweep_parameters(parameter, parameter_range, constants):
             Population in shelving state |s⟩.
         - photons : list of float
             Mean photon number ⟨a†a⟩ in the cavity.
-"""
+    """
     sigma_ge, sigma_se, a, P_g, P_s, P_e = define_basis_operators(constants["Ncav"])
     pg, pe, ps, photons = [], [], [], []
 
-    #finds correct hamiltonian 
-    if parameter =='g':
-        H_func = lambda val,constants:H_op_g(val, sigma_ge,sigma_se, a,constants)
-    elif parameter == 'rabi':
-        H_func = lambda val,constants:H_op_rabi(val, sigma_ge,sigma_se, a,constants)
-    else: 
-        H_func = lambda _,constants: H_op_default(sigma_ge,sigma_se,a,constants)
+    # finds correct hamiltonian
+    if parameter == "g":
+        H_func = lambda val, constants: H_op_g(val, sigma_ge, sigma_se, a, constants)
+    elif parameter == "rabi":
+        H_func = lambda val, constants: H_op_rabi(val, sigma_ge, sigma_se, a, constants)
+    else:
+        H_func = lambda _, constants: H_op_default(sigma_ge, sigma_se, a, constants)
 
     for value in parameter_range:
-        #for kappa and gamma updates the values for these parameters
+        # for kappa and gamma updates the values for these parameters
         temp_const = constants.copy()
         temp_const[parameter] = value
 
-        H = H_func(value,temp_const)
+        H = H_func(value, temp_const)
 
         c_ops = [
             np.sqrt(temp_const["kappa"]) * a,
-            np.sqrt(temp_const["gamma"]) * sigma_ge
-            ]
-        
+            np.sqrt(temp_const["gamma"]) * sigma_ge,
+        ]
+
         rho_ss = steadystate(H, c_ops)
         pg.append(expect(P_g, rho_ss))
         pe.append(expect(P_e, rho_ss))
         ps.append(expect(P_s, rho_ss))
         photons.append(expect(a.dag() * a, rho_ss))
+
     return parameter_range, pg, pe, ps, photons
-
-
 
 
 if __name__ == "__main__":
@@ -322,7 +318,7 @@ if __name__ == "__main__":
         "gval": 1.0,
         "detune_c": 1.0,
         "detune_l": 1.0,
-        "Ncav": 4
+        "Ncav": 4,
     }
     times, n_pop, g_pop, e_pop, s_pop = run_sim()
     plt.plot(times, n_pop, label="Photon numbers")
