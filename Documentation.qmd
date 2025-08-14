@@ -1,17 +1,16 @@
----
-title: "Physics Writeup"
-format:
-  pdf:
-    documentclass: article
-    include-in-header:
-      text: |
-        \usepackage{graphicx} % Required for inserting images
-        \usepackage{physics}
-        \usepackage{dsfont}
-        \usepackage{amsmath}
-execute:
-  eval: false
----
+\documentclass{article}
+\usepackage{graphicx} % Required for inserting images
+\usepackage{physics}
+\usepackage{dsfont}
+\usepackage{amsmath}
+\title{CAIPE}
+\author{nikhailvirik }
+\date{August 2025}
+
+\begin{document}
+
+\maketitle
+
 \section{Introduction}
 We are simulating light-matter interactions in an enhanced optical cavity in a $\lambda$-system set-up. The set-up is that of an optical cavity in which a three level system is placed inside an optical resonator, which one can imagine as a space between two mirrors. We assume the space within and surrounding the resonator has a background EM field with zero mean, but finite fluctuations. As such the surrounding space contains photon modes that can hold individual photons according to their defined wavevectors, $\vec{k}$. 
 The $\lambda$-system has three possible states, $\ket{g}$, $\ket{s}$,  and $\ket{e}$, known as the ground state, metastable state and excited state respectively. The states have energies in order $E_{\ket{e}} > E_{\ket{s}} > E_{\ket{g}} $. These sates can be easily implemented in Qutip by setting 
@@ -40,13 +39,7 @@ The $\lambda$-system has three possible states, $\ket{g}$, $\ket{s}$,  and $\ket
         1 
     \end{pmatrix}
 \end{equation}
-```{python}
-# This is a Python code chunk
-from qutip import basis
-g = basis(3, 0)  # ground state
-e = basis(3, 1)  # excited state
-s = basis(3, 2)  # metastable state
-```
+Include code snippet
 
 The basis for the photons in the surrounding field is the Fock number basis $\ket{n_{k}}$, where $n_{k}$ is the number of photons with wavevector of magnitude $k$, so for example, if the field has one photon with wavevector $\vec{k}_{1}$ and one with wavevector $\vec{k}_{2}$, then the field state is $\ket{0...1...1....0}$ with ones at position $k_{1}$ and $k_{2}$. Note, the importance of the mirrors in the resonator is so that photons continually bounce between them and stay within the resonator, allowing any one photon to interact with the matter system multiple times. This is what we mean by the system being cavity enhanced. We will now take the mirrors to be lossy such that photons can enter and escape the resonator. This will allow photons driven by an external laser to interact with the matter system in the simulation. 
 
@@ -60,42 +53,7 @@ With this in mind, we define our Hamiltonian as
 \sigma_{ge} + a_{\vec{k}}\sigma_{ge}^{\dagger}) + \Omega(\sigma_{se} + \sigma_{se}^{\dagger})
 \end{equation}
 Where we have defined $\sigma_{se} = \mathds{1} \otimes \ket{s}\bra{e} $ as the system lowering operator from state $\ket{e}$ to $\ket{s}$ and accordingly $\sigma_{se}^{\dagger} = \mathds{1} \otimes \ket{e}\bra{s} $ as the raising operator from $\ket{s}$ to $\ket{e}$. Similarly, $\sigma_{ge} = \mathds{1} \otimes \ket{g}\bra{e} $ is the  lowering operator from $\ket{e}$ to $\ket{g}$ and  $\sigma_{ge}^{\dagger} = \mathds{1} \otimes \ket{e}\bra{g} $ is the raising operator from $\ket{g}$ to $\ket{e}$. Furthermore, we define $a_{\vec{k}} \equiv a_{\vec{k}} \otimes \mathds{1}$ as the field annihilation operator that destroys a photon of wave vector $\vec{k}$, and $a_{\vec{k}}^{\dagger} \equiv a_{\vec{k}}^{\dagger} \otimes \mathds{1} $ create a photon at said $\vec{k}$. This can be implemented in Qutip by 
-```{python}
-# This is a Python code chunk
-from qutip import *
-Ncav=4,
-detune_c=1.0,
-detune_l=1.0,
-g_val=1.0,
-rabi=2.0,
-Ncav = Ncav  # photon truncation
-# Operators on atom
-sigma_ge = g * e.dag()
-sigma_se = s * e.dag()
-I_atom = qeye(3)
-
-# Operators on cavity
-a = destroy(Ncav)
-I_cav = qeye(Ncav)
-
-# Tensor operators
-a = tensor(a, I_atom)
-sigma_ge = tensor(I_cav, sigma_ge)
-sigma_se = tensor(I_cav, sigma_se)
-# Parameters
-detune_c = detune_c  # Detuning between cavity resonance and atomic |g⟩↔|e⟩ transition frequency
-detune_l = detune_l  # Detuning between classical laser and atomic |s⟩↔|e⟩ transition frequency
-g_val = g_val  # Atom–cavity coupling strength (vacuum Rabi frequency) for |g⟩↔|e⟩ transition
-rabi = rabi  # Rabi frequency of classical laser driving |s⟩↔|e⟩ transition
-
-# Hamiltonian
-H = (
-    detune_c * a.dag() * a
-    + detune_l * sigma_se.dag() * sigma_se
-    + g_val * (a.dag() * sigma_ge + a * sigma_ge.dag())
-    + rabi * (sigma_se + sigma_se.dag())
-)
-```
+INSERT CODE SNIPPET
 $\Delta{c} = |\omega_{L} - \omega_{ge}|$ is the detuning ie frequency difference between laser drive and the frequency of $E_{\ket{e}} - E_{\ket{g}}$ energy difference. Similarly, $\Delta_{l} = |\omega_{L} - \omega_{se}|$ is the detuning between laser drive frequency and frequency of $E_{\ket{e}} - E_{\ket{s}}$ energy difference. $g$ is the coupling strength coefficient between the matter system and the field, and $\Omega$ is the Rabi oscillation frequency representing lasing amplitude.
 
 Notice that since the mirrors are lossy, not only can laser driven photons enter the resonator, but photons from within the resonator can also leak out and souple to modes outside the resonator. We take there to be a continuum of modes outside, as supposed to modes within the resonator which are restricted to half-integer wavelengths fitting within resonator length. As such, the contiuum of modes external to the resonator can be taken as an environment, meaning that the set-up is effectively that of an open quantum system. As such, the state exists as a pure state density matrix $\rho = \rho_{sys} \otimes \rho_{env}$. Since we are only interested in system dynamics, we can trace over environement degrees of freedom and work with just $\rho_{sys}$. Note, by system here we mean the matter system and field modes within the resonator, not just the matter system itself. The structure of $\rho_{sys}$ is as 
@@ -107,12 +65,7 @@ Notice that since the mirrors are lossy, not only can laser driven photons enter
     \end{pmatrix}
 \end{equation}
 Here $\rho_{xx}$ is the probability (ie population) of the electron being in state $\ket{x}$ and must satisfy $\Sigma_{j}\rho_{jj} = 1$, while $\rho_{xy}$ is the coherence between the $\ket{x}$ and $\ket{y}$ states that satisfies $\rho_{xy} = \rho_{yx}^{*}$.
-The state is initialized in $\rho_{sys} = \ket{0 0 0 0} \bra{s}$, ie with resonator of four total cavity modes of zero photons and matter system in $\ket{s}$. This is done in Qutip by 
-```{python}
-init_cav=0,
-init_sys=2,
-psi = tensor(basis(Ncav, init_cav), basis(3, init_sys))
-```
+The state is initialized in $\rho_{sys} = \ket{0 0 0 0} \bra{s}$, ie with resonator of four total cavity modes of zero photons and matter system in $\ket{s}$. This is done in Qutip by INSERT CODE SNIPPET
 
 Due to the open quantum nature, the dynamics can be modeled using the Linblad Master Equation given by 
 
@@ -123,17 +76,7 @@ Due to the open quantum nature, the dynamics can be modeled using the Linblad Ma
 \end{flalign*}
 Here $L_{1}$ and $L_{2}$ are the collapse operators that represent losses from the system to the environment. $\kappa$ here is the cavity photon decay rate of photons leaking through the mirrors, while $\gamma$ is the spontaneous decay rate from $\ket{e}$ to $\ket{g}$. These are the two processes by which energy leaves the resonator (system). 
 This equation can be implemented into Qutip using MESolve, where the collapse operators are taken as arguments
-```{python}
-from qutip import *
-kappa=0.2,
-gamma=0.05
-c_ops = [np.sqrt(kappa) * a, np.sqrt(gamma) * sigma_ge]
-psi = tensor(basis(Ncav, init_cav), basis(3, init_sys))
-
-result = mesolve(
-    H, psi, times, c_ops, [a.dag() * a, sigma_ge.dag() * sigma_ge, P_g, P_s]
-)
-```
+INSERT CODE SINPPET
 Note, the third argument in MESolve is the list of operators whose expectation values are to be returned.
 Finally, we can define the cooperativity to be 
 \begin{equation}
