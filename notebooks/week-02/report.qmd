@@ -5,7 +5,7 @@ date-format: "D MMMM YYYY"
 
 format:
   html: default
-  pdf: default
+  typst: default
 ---
 
 ## Introduction
@@ -14,14 +14,13 @@ This is a skeleton report showing how they can be written.
 
 To render this report, from the project root directory run:
 
-```{bash}
+```bash
 quarto render notebooks/week-02/report.qmd
-
 ```
 
 For a live preview that updates as you make edits, run:
 
-```{bash}
+```bash
 quarto preview notebooks/week-02/report.qmd
 ```
 
@@ -42,7 +41,7 @@ import numpy as np
 
 ```{python}
 %%time
-times, n_pop, g_pop, e_pop, s_pop = run_sim()
+times, n_pop, g_pop, e_pop, s_pop = run_sim(t_steps=200)
 ```
 
 ## Plot simulation
@@ -59,19 +58,32 @@ plt.show()
 
 ## Parameter sweeps
 
+```{python}
+from caipe_sim.three_level_model import sweep_parameters
+constants = {
+  "gamma": 0.05,
+  "kappa": 0.2,
+  "rabi": 2.0,
+  "gval": 1.0,
+  "detune_c": 1.0,
+  "detune_l": 1.0,
+  "Ncav": 4,
+}
+```
+
 ### $\kappa$ sweep
 
 ```{python}
 %%time
-from caipe_sim.three_level_model import sweep_kappa
-kap_vals, kap_g, kap_e, kap_s, kap_photon = sweep_kappa(0.01, 1, 100)
+kappa_range = np.linspace(0.01, 1, 100)
+kap_g, kap_e, kap_s, kap_photon = sweep_parameters('kappa', kappa_range, constants.copy())
 ```
 
 ```{python}
-plt.plot(kap_vals, kap_g, label="|g⟩ population")
-plt.plot(kap_vals, kap_e, label="|e⟩ population")
-plt.plot(kap_vals, kap_s, label="|s⟩ population")
-plt.plot(kap_vals, kap_photon, label="Photon population")
+plt.plot(kappa_range, kap_g, label="|g⟩ population")
+plt.plot(kappa_range, kap_e, label="|e⟩ population")
+plt.plot(kappa_range, kap_s, label="|s⟩ population")
+plt.plot(kappa_range, kap_photon, label="Photon population")
 plt.title("Kappa sweep")
 plt.legend()
 plt.show()
@@ -81,15 +93,15 @@ plt.show()
 
 ```{python}
 %%time
-from caipe_sim.three_level_model import sweep_gamma
-gam_vals, gam_g, gam_e, gam_s, gam_photon = sweep_gamma(0.01, 1, 100)
+gamma_range = np.linspace(0.01, 1, 100)
+gam_g, gam_e, gam_s, gam_photon = sweep_parameters('gamma', gamma_range, constants.copy())
 ```
 
 ```{python}
-plt.plot(gam_vals, gam_g, label="|g⟩ population")
-plt.plot(gam_vals, gam_e, label="|e⟩ population")
-plt.plot(gam_vals, gam_s, label="|s⟩ population")
-plt.plot(gam_vals, gam_photon, label="Photon population")
+plt.plot(gamma_range, gam_g, label="|g⟩ population")
+plt.plot(gamma_range, gam_e, label="|e⟩ population")
+plt.plot(gamma_range, gam_s, label="|s⟩ population")
+plt.plot(gamma_range, gam_photon, label="Photon population")
 plt.title("Gamma sweep")
 plt.legend()
 plt.show()
@@ -98,15 +110,15 @@ plt.show()
 ### Rabi sweep
 
 ```{python}
-from caipe_sim.three_level_model import sweep_rabi
-rabi_vals, rabi_g, rabi_e, rabi_s, rabi_photon = sweep_rabi(0.01, 1, 100)
+rabi_range = np.linspace(0.01, 1, 100)
+rabi_g, rabi_e, rabi_s, rabi_photon = sweep_parameters('rabi', rabi_range, constants.copy())
 ```
 
 ```{python}
-plt.plot(rabi_vals, rabi_g, label="|g⟩ population")
-plt.plot(rabi_vals, rabi_e, label="|e⟩ population")
-plt.plot(rabi_vals, rabi_s, label="|s⟩ population")
-plt.plot(rabi_vals, rabi_photon, label="Photon population")
+plt.plot(rabi_range, rabi_g, label="|g⟩ population")
+plt.plot(rabi_range, rabi_e, label="|e⟩ population")
+plt.plot(rabi_range, rabi_s, label="|s⟩ population")
+plt.plot(rabi_range, rabi_photon, label="Photon population")
 plt.title("Rabi sweep")
 plt.show()
 ```
@@ -115,15 +127,15 @@ plt.show()
 
 ```{python}
 %%time
-from caipe_sim.three_level_model import sweep_gval
-gval_vals, gval_g, gval_e, gval_s, gval_photon = sweep_gval(0.01, 1, 100)
+gval_range = np.linspace(0.01, 1, 100)
+gval_g, gval_e, gval_s, gval_photon = sweep_parameters('gval', gval_range, constants.copy())
 ```
 
 ```{python}
-plt.plot(gval_vals, gval_g, label="|g⟩ population")
-plt.plot(gval_vals, gval_e, label="|e⟩ poopulation")
-plt.plot(gval_vals, gval_s, label="|s⟩ population")
-plt.plot(gval_vals, gval_photon, label="Photon population")
+plt.plot(gval_range, gval_g, label="|g⟩ population")
+plt.plot(gval_range, gval_e, label="|e⟩ poopulation")
+plt.plot(gval_range, gval_s, label="|s⟩ population")
+plt.plot(gval_range, gval_photon, label="Photon population")
 plt.title("g-val sweep")
 plt.legend()
 plt.show()

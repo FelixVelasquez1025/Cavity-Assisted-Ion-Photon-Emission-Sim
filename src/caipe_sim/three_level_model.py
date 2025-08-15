@@ -229,8 +229,8 @@ def sweep_parameters(parameter, parameter_range, constants):
         H = H_op(sigma_ge, sigma_se, a, constants)  # update Hamiltonian
 
         c_ops = [
-            np.sqrt(temp_const["kappa"]) * a,
-            np.sqrt(temp_const["gamma"]) * sigma_ge,
+            np.sqrt(constants["kappa"]) * a,
+            np.sqrt(constants["gamma"]) * sigma_ge,
         ]
 
         rho_ss = steadystate(H, c_ops)
