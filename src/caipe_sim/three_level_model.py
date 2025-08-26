@@ -260,3 +260,5 @@ if __name__ == "__main__":
     plt.plot(times, g_pop + e_pop + s_pop, label="Total population")
     plt.legend()
     plt.show()
+
+

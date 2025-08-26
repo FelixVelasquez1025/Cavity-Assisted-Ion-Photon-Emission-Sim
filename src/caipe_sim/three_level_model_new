@@ -11,6 +11,45 @@ from qutip import steadystate
 from tqdm import tqdm
 
 
+def define_basis_operators(Ncav=4):
+    """
+    Defines the key operators for a three-level atom coupled to an optical cavity.
+
+    Parameters
+    ----------
+    Ncav : int, optional
+        maximum amount of photons in optical cavity, default = 4
+
+    Returns
+    -------
+    tuple
+        - sigma_ge : Qobj
+            Lowering operator from |e⟩ to |g⟩.
+        - sigma_se : Qobj
+            Lowering operator from |e⟩ to |s⟩.
+        - a : Qobj
+            Cavity annihilation operator.
+        - P_g : Qobj
+            Projector onto the ground state |g⟩.
+        - P_s : Qobj
+            Projector onto the metastable state |s⟩.
+        - P_e : Qobj
+            Projector onto the excited state |e⟩.
+    """
+    g = basis(3, 0)
+    e = basis(3, 1)
+    s = basis(3, 2)
+
+    sigma_ge = tensor(qeye(Ncav), g * e.dag())
+    sigma_se = tensor(qeye(Ncav), s * e.dag())
+    a = tensor(destroy(Ncav), qeye(3))
+
+    P_g = tensor(qeye(Ncav), g * g.dag())
+    P_s = tensor(qeye(Ncav), s * s.dag())
+    P_e = tensor(qeye(Ncav), e * e.dag())
+
+    return sigma_ge, sigma_se, a, P_g, P_s, P_e
+
 def run_sim(
     t_start=0.0,
     t_end=10.0,
@@ -83,35 +122,8 @@ def run_sim(
     times = np.linspace(t_start, t_end, t_steps)
 
     Ncav = Ncav  # photon truncation
-    Natom = 3  # three-level atom
 
-    # Define basis states
-    g = basis(3, 0)  # ground state
-    e = basis(3, 1)  # excited state
-    s = basis(3, 2)  # metastable state
-
-    # Operators on atom
-    sigma_ge = g * e.dag()
-    sigma_se = s * e.dag()
-    I_atom = qeye(3)
-
-    # Operators on cavity
-    a = destroy(Ncav)
-    I_cav = qeye(Ncav)
-
-    # Tensor operators
-    a = tensor(a, I_atom)
-    sigma_ge = tensor(I_cav, sigma_ge)
-    sigma_se = tensor(I_cav, sigma_se)
-
-    proj_g = basis(3, 0) * basis(3, 0).dag()  # |g⟩⟨g|
-    proj_s = basis(3, 2) * basis(3, 2).dag()  # |s⟩⟨s|
-    proj_e = basis(3, 1) * basis(3, 1).dag()
-
-    # Tensor with identity on cavity space
-    P_g = tensor(qeye(Ncav), proj_g)
-    P_s = tensor(qeye(Ncav), proj_s)
-    P_e = tensor(qeye(Ncav), proj_e)
+    sigma_ge, sigma_se, a, P_g, P_s, P_e = define_basis_operators(Ncav)
 
     # Parameters
     detune_c = detune_c  # Detuning between cavity resonance and atomic |g⟩↔|e⟩ transition frequency
@@ -136,46 +148,6 @@ def run_sim(
         H, psi, times, c_ops, [a.dag() * a, sigma_ge.dag() * sigma_ge, P_g, P_s]
     )
     return times, result.expect[0], result.expect[1], result.expect[2], result.expect[3]
-
-
-def define_basis_operators(Ncav=4):
-    """
-    Defines the key operators for a three-level atom coupled to an optical cavity.
-
-    Parameters
-    ----------
-    Ncav : int, optional
-        maximum amount of photons in optical cavity, default = 4
-
-    Returns
-    -------
-    tuple
-        - sigma_ge : Qobj
-            Lowering operator from |e⟩ to |g⟩.
-        - sigma_se : Qobj
-            Lowering operator from |e⟩ to |s⟩.
-        - a : Qobj
-            Cavity annihilation operator.
-        - P_g : Qobj
-            Projector onto the ground state |g⟩.
-        - P_s : Qobj
-            Projector onto the metastable state |s⟩.
-        - P_e : Qobj
-            Projector onto the excited state |e⟩.
-    """
-    g = basis(3, 0)
-    e = basis(3, 1)
-    s = basis(3, 2)
-
-    sigma_ge = tensor(qeye(Ncav), g * e.dag())
-    sigma_se = tensor(qeye(Ncav), s * e.dag())
-    a = tensor(destroy(Ncav), qeye(3))
-
-    P_g = tensor(qeye(Ncav), g * g.dag())
-    P_s = tensor(qeye(Ncav), s * s.dag())
-    P_e = tensor(qeye(Ncav), e * e.dag())
-
-    return sigma_ge, sigma_se, a, P_g, P_s, P_e
 
 
 def H_op(sigma_ge, sigma_se, a, const):
@@ -249,7 +221,7 @@ def sweep_parameters(parameter, parameter_range, constants):
     return pg, pe, ps, photons, eff, coop
 
 
-if _name_ == "_main_":
+if __name__ == "__main__":
     constants = {
         "gamma": 0.05,
         "kappa": 0.2,
@@ -276,7 +248,7 @@ if _name_ == "_main_":
         "detune_l": 1.0,
         "Ncav": 4,
     }
-    g_val_vals = np.linspace(0.01, 5, 500)
+    g_val_vals = np.linspace(0.01, 1.5, 100)
     pg_gval,pe_gval,ps_gval,photons_gval, eff_gval, coop_gval = sweep_parameters('gval', g_val_vals, constants_gval)
     plt.plot(g_val_vals, pg_gval, label='|g>')
     plt.plot(g_val_vals, pe_gval, label='|e>')
@@ -343,3 +315,4 @@ if _name_ == "_main_":
     plt.ylabel('Efficency')
     plt.title('Copperativity Sweep (ΔGamma)')
     plt.show()
+    print("Finished")
