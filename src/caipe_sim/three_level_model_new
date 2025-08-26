@@ -237,7 +237,9 @@ if __name__ == "__main__":
     plt.plot(times, e_pop, label="|g⟩ population")
     plt.plot(times, s_pop, label="|s⟩ population")
     plt.plot(times, g_pop + e_pop + s_pop, label="Total population")
+    plt.xlabel("Time")
     plt.legend()
+    plt.grid()
     plt.show()
 
     constants_gval = {
@@ -278,7 +280,7 @@ if __name__ == "__main__":
     plt.plot(kappa_vals, ps_kappa, label='|s>')
     plt.plot(kappa_vals, photons_kappa, label='photons')
     plt.plot(kappa_vals, eff_kappa, label='effiency')
-    plt.xlabel('kappa')
+    plt.xlabel('Kappa')
     plt.ylabel('Population')
     plt.title('Kappa Sweep')
     plt.legend()
