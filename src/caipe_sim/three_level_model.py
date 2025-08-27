@@ -8,7 +8,47 @@ import numpy as np
 import matplotlib.pyplot as plt
 from qutip import *
 from qutip import steadystate
+from tqdm import tqdm
 
+
+def define_basis_operators(Ncav=4):
+    """
+    Defines the key operators for a three-level atom coupled to an optical cavity.
+
+    Parameters
+    ----------
+    Ncav : int, optional
+        maximum amount of photons in optical cavity, default = 4
+
+    Returns
+    -------
+    tuple
+        - sigma_ge : Qobj
+            Lowering operator from |e⟩ to |g⟩.
+        - sigma_se : Qobj
+            Lowering operator from |e⟩ to |s⟩.
+        - a : Qobj
+            Cavity annihilation operator.
+        - P_g : Qobj
+            Projector onto the ground state |g⟩.
+        - P_s : Qobj
+            Projector onto the metastable state |s⟩.
+        - P_e : Qobj
+            Projector onto the excited state |e⟩.
+    """
+    g = basis(3, 0)
+    e = basis(3, 1)
+    s = basis(3, 2)
+
+    sigma_ge = tensor(qeye(Ncav), g * e.dag())
+    sigma_se = tensor(qeye(Ncav), s * e.dag())
+    a = tensor(destroy(Ncav), qeye(3))
+
+    P_g = tensor(qeye(Ncav), g * g.dag())
+    P_s = tensor(qeye(Ncav), s * s.dag())
+    P_e = tensor(qeye(Ncav), e * e.dag())
+
+    return sigma_ge, sigma_se, a, P_g, P_s, P_e
 
 def run_sim(
     t_start=0.0,
@@ -75,42 +115,15 @@ def run_sim(
 
     Notes
     -----
-    The system is described in the rotating frame and solved using `qutip.mesolve`
+    The system is described in the rotating frame and solved using qutip.mesolve
     with collapse operators for cavity decay and spontaneous emission.
     """
     # Parameters
     times = np.linspace(t_start, t_end, t_steps)
 
     Ncav = Ncav  # photon truncation
-    Natom = 3  # three-level atom
 
-    # Define basis states
-    g = basis(3, 0)  # ground state
-    e = basis(3, 1)  # excited state
-    s = basis(3, 2)  # metastable state
-
-    # Operators on atom
-    sigma_ge = g * e.dag()
-    sigma_se = s * e.dag()
-    I_atom = qeye(3)
-
-    # Operators on cavity
-    a = destroy(Ncav)
-    I_cav = qeye(Ncav)
-
-    # Tensor operators
-    a = tensor(a, I_atom)
-    sigma_ge = tensor(I_cav, sigma_ge)
-    sigma_se = tensor(I_cav, sigma_se)
-
-    proj_g = basis(3, 0) * basis(3, 0).dag()  # |g⟩⟨g|
-    proj_s = basis(3, 2) * basis(3, 2).dag()  # |s⟩⟨s|
-    proj_e = basis(3, 1) * basis(3, 1).dag()
-
-    # Tensor with identity on cavity space
-    P_g = tensor(qeye(Ncav), proj_g)
-    P_s = tensor(qeye(Ncav), proj_s)
-    P_e = tensor(qeye(Ncav), proj_e)
+    sigma_ge, sigma_se, a, P_g, P_s, P_e = define_basis_operators(Ncav)
 
     # Parameters
     detune_c = detune_c  # Detuning between cavity resonance and atomic |g⟩↔|e⟩ transition frequency
@@ -135,46 +148,6 @@ def run_sim(
         H, psi, times, c_ops, [a.dag() * a, sigma_ge.dag() * sigma_ge, P_g, P_s]
     )
     return times, result.expect[0], result.expect[1], result.expect[2], result.expect[3]
-
-
-def define_basis_operators(Ncav=4):
-    """
-    Defines the key operators for a three-level atom coupled to an optical cavity.
-
-    Parameters
-    ----------
-    Ncav : int, optional
-        maximum amount of photons in optical cavity, default = 4
-
-    Returns
-    -------
-    tuple
-        - sigma_ge : Qobj
-            Lowering operator from |e⟩ to |g⟩.
-        - sigma_se : Qobj
-            Lowering operator from |e⟩ to |s⟩.
-        - a : Qobj
-            Cavity annihilation operator.
-        - P_g : Qobj
-            Projector onto the ground state |g⟩.
-        - P_s : Qobj
-            Projector onto the metastable state |s⟩.
-        - P_e : Qobj
-            Projector onto the excited state |e⟩.
-    """
-    g = basis(3, 0)
-    e = basis(3, 1)
-    s = basis(3, 2)
-
-    sigma_ge = tensor(qeye(Ncav), g * e.dag())
-    sigma_se = tensor(qeye(Ncav), s * e.dag())
-    a = tensor(destroy(Ncav), qeye(3))
-
-    P_g = tensor(qeye(Ncav), g * g.dag())
-    P_s = tensor(qeye(Ncav), s * s.dag())
-    P_e = tensor(qeye(Ncav), e * e.dag())
-
-    return sigma_ge, sigma_se, a, P_g, P_s, P_e
 
 
 def H_op(sigma_ge, sigma_se, a, const):
@@ -222,9 +195,9 @@ def sweep_parameters(parameter, parameter_range, constants):
             Mean photon number ⟨a†a⟩ in the cavity.
     """
     sigma_ge, sigma_se, a, P_g, P_s, P_e = define_basis_operators(constants["Ncav"])
-    pg, pe, ps, photons = [], [], [], []
+    pg, pe, ps, photons, eff, coop = [], [], [], [], [], []
 
-    for value in parameter_range:
+    for value in tqdm(parameter_range):
         constants[parameter] = value  # update sweep parameter
         H = H_op(sigma_ge, sigma_se, a, constants)  # update Hamiltonian
 
@@ -238,8 +211,14 @@ def sweep_parameters(parameter, parameter_range, constants):
         pe.append(expect(P_e, rho_ss))
         ps.append(expect(P_s, rho_ss))
         photons.append(expect(a.dag() * a, rho_ss))
+        efficiency = (constants["kappa"]* expect(a * a.dag(), rho_ss)) / (
+                    constants["gamma"]* expect(sigma_ge * sigma_ge.dag(), rho_ss)
+                    + constants["kappa"]* expect(a * a.dag(), rho_ss)
+                )
+        eff.append(efficiency)
+        coop.append((constants["gval"] * constants["gval"]) / (constants["kappa"] * constants["gamma"]))
 
-    return pg, pe, ps, photons
+    return pg, pe, ps, photons, eff, coop
 
 
 if __name__ == "__main__":
@@ -258,5 +237,89 @@ if __name__ == "__main__":
     plt.plot(times, e_pop, label="|g⟩ population")
     plt.plot(times, s_pop, label="|s⟩ population")
     plt.plot(times, g_pop + e_pop + s_pop, label="Total population")
+    plt.xlabel("Time")
     plt.legend()
+    plt.grid()
     plt.show()
+
+    constants_gval = {
+        "gamma": 0.05,
+        "kappa": 0.2,
+        "rabi": 2.0,
+        "detune_c": 1.0,
+        "detune_l": 1.0,
+        "Ncav": 4,
+    }
+    g_val_vals = np.linspace(0.01, 1.5, 100)
+    pg_gval,pe_gval,ps_gval,photons_gval, eff_gval, coop_gval = sweep_parameters('gval', g_val_vals, constants_gval)
+    plt.plot(g_val_vals, pg_gval, label='|g>')
+    plt.plot(g_val_vals, pe_gval, label='|e>')
+    plt.plot(g_val_vals, ps_gval, label='|s>')
+    plt.plot(g_val_vals, photons_gval, label='photons')
+    plt.plot(g_val_vals, eff_gval, label='efficiency')
+    plt.xlabel('g_val')
+    plt.ylabel('Population')
+    plt.title('g_val Sweep')
+    plt.legend()
+    plt.grid()
+    plt.show()
+    
+    constants_kappa = {
+        "gamma": 0.05,
+        "rabi": 2.0,
+        "gval": 1.0,
+        "detune_c": 1.0,
+        "detune_l": 1.0,
+        "Ncav": 4,
+    }
+
+    kappa_vals = np.linspace(0.01, 1, 1000)
+    pg_kappa,pe_kappa,ps_kappa,photons_kappa, eff_kappa, coop_kappa = sweep_parameters('kappa', kappa_vals, constants_kappa)
+    plt.plot(kappa_vals, pg_kappa, label='|g>')
+    plt.plot(kappa_vals, pe_kappa, label='|e>')
+    plt.plot(kappa_vals, ps_kappa, label='|s>')
+    plt.plot(kappa_vals, photons_kappa, label='photons')
+    plt.plot(kappa_vals, eff_kappa, label='effiency')
+    plt.xlabel('Kappa')
+    plt.ylabel('Population')
+    plt.title('Kappa Sweep')
+    plt.legend()
+    plt.grid()
+    plt.show()
+
+    plt.plot(coop_kappa, eff_kappa)
+    plt.xlabel('Cooperativity')
+    plt.ylabel('Efficiency')
+    plt.title('Copperativity Sweep (ΔKappa)')
+    plt.grid()
+    plt.show()
+
+    constants_gamma = {
+        "kappa": 0.2,
+        "rabi": 2.0,
+        "gval": 1.0,
+        "detune_c": 1.0,
+        "detune_l": 1.0,
+        "Ncav": 4,
+    }
+
+    gamma_vals = np.linspace(0.01, 1, 1000)
+    pg_gamma,pe_gamma,ps_gamma,photons_gamma, eff_gamma, coop_gamma = sweep_parameters('gamma', gamma_vals, constants_gamma)
+    plt.plot(gamma_vals, pg_gamma, label='|g>')
+    plt.plot(gamma_vals, pe_gamma, label='|e>')
+    plt.plot(gamma_vals, ps_gamma, label='|s>')
+    plt.plot(gamma_vals, photons_gamma, label='photons')
+    plt.plot(gamma_vals, eff_gamma, label='efficiency')
+    plt.xlabel('Gamma')
+    plt.ylabel('Population')
+    plt.title('Gamma Sweep')
+    plt.legend()
+    plt.grid()
+    plt.show()
+    plt.plot(coop_gamma, eff_gamma)
+    plt.xlabel('Cooperativity')
+    plt.ylabel('Efficiency')
+    plt.title('Copperativity Sweep (ΔGamma)')
+    plt.grid()
+    plt.show()
+    print("Finished")
