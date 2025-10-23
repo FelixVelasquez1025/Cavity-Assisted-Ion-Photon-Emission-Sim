@@ -17,7 +17,11 @@ from __future__ import annotations
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.widgets import Slider, RadioButtons, CheckButtons, Button
+from scipy import constants as consts
 from qutip import basis, destroy, mesolve, qeye, tensor
+
+# Hbar in qutip is set to 1, using the real value throws off the dynamics of the system. For simplicity we take hbar = 1. 
+hbar = 1
 
 
 def three_level_rabi(
@@ -97,11 +101,13 @@ def three_level_rabi(
 def three_level_atom_driven(
 
     delta_drive: float = 0.0,
+    delta_c: float = 0.0,
     delta_rep: float = 0.0,
     rabi_drive: float = 1.0,
     rabi_repump: float = 0.0,
     gamma_eg: float = 0.05,
     gamma_es: float = 0.05,
+    g_cav: float = 0.0,
     tmax: float = 40.0,
     steps: int = 400,
     start: str = "e",
@@ -118,23 +124,30 @@ def three_level_atom_driven(
         return basis(3, 0), basis(3, 1), basis(3, 2)
 
     def three_level_ops():
-        g, e, s = three_level_basis()
-        sig_gg = g * g.dag()
-        sig_ee = e * e.dag()
-        sig_ss = s * s.dag()
-        sig_ge = g * e.dag()
-        sig_se = s * e.dag()
-        return np.array([sig_gg, sig_ee, sig_ss, sig_ge, sig_se], dtype=object)
+        one, two, three = three_level_basis()
+        sig11 = one * one.dag()
+        sig22 = two * two.dag()
+        sig33 = three * three.dag()
+        sig12 = one * two.dag()
+        sig32 = three * two.dag()
+        return np.array([sig11, sig22, sig33, sig12, sig32], dtype=object)
 
-    sig_gg, sig_ee, sig_ss, sig_ge, sig_se = three_level_ops()
+    sig11, sig22, sig33, sig12, sig32 = three_level_ops()
 
-    # Atom-only Hamiltonian in rotating frame (no cavity here)
-    # H = Delta_ge |e><e| + Delta_se |s><s| + (Omega_ge/2)(|e><g| + |g><e|) [+ repump term]
-    H_0 = delta_drive * sig_ee + delta_rep * sig_ss
-    H_drive = 0.5 * rabi_drive * (sig_ge + sig_ge.dag())
-    H_rep = 0.5 * rabi_repump * (sig_se + sig_se.dag())
+    # Build the Hamiltonian components as originally structured
+    # Set a as a zero operator to keep terms present but inert without a full cavity space
+    a = 0 * qeye(3)
+    H_0 = hbar * (
+        delta_drive * sig11 + delta_rep * sig33 + (delta_c - delta_rep) * a.dag() * a
+    )
+    H_drive = 0.5 * hbar * rabi_drive * (sig12 + sig12.dag())
+    H_rep = 0.5 * hbar * rabi_repump * (sig32 + sig32.dag())
+    H_cavity = hbar * g_cav * (a * sig32.dag() + a.dag() * sig32)
 
-    H = H_0 + H_drive + (H_rep if pump else 0)
+    if pump is False:
+        H = H_0 + H_drive + H_cavity
+    else:
+        H = H_0 + H_drive + H_rep + H_cavity
 
     # Initial state
     if start == "e":
@@ -147,12 +160,12 @@ def three_level_atom_driven(
     # Collapse operators
     c_ops = []
     if gamma_eg > 0:
-        c_ops.append(np.sqrt(gamma_eg) * sig_ge)  # e->g
+        c_ops.append(np.sqrt(gamma_eg) * sig12)  # e->g
     if gamma_es > 0:
-        c_ops.append(np.sqrt(gamma_es) * sig_se)  # e->s 
+        c_ops.append(np.sqrt(gamma_es) * sig32)  # e->s 
 
     tlist = np.linspace(0.0, tmax, steps)
-    result = mesolve(H, psi0, tlist, c_ops=c_ops, e_ops=[sig_gg, sig_ee, sig_ss])
+    result = mesolve(H, psi0, tlist, c_ops=c_ops, e_ops=[sig11, sig22, sig33])
     Pg = np.array(result.expect[0])
     Pe = np.array(result.expect[1])
     Ps = np.array(result.expect[2])
