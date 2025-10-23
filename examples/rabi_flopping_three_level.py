@@ -136,7 +136,7 @@ def three_level_atom_driven(
 
     # Build the Hamiltonian components as originally structured
     # Set a as a zero operator to keep terms present but inert without a full cavity space
-    a = 0 * qeye(3)
+    a = destroy(3)
     H_0 = hbar * (
         delta_drive * sig11 + delta_rep * sig33 + (delta_c - delta_rep) * a.dag() * a
     )
