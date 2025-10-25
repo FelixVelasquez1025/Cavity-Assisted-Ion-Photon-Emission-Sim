@@ -2,9 +2,11 @@
 title: "Rabi Hamiltonian (QuTiP)"
 author: "CAIPE-sim"
 format:
-  pptx:
+  revealjs:
     slide-number: true
     incremental: false
+    scrollable: true
+    smaller: true
 editor: visual
 ---
 
@@ -13,7 +15,7 @@ editor: visual
 In the two level system we are using the Jaynes-Cumming model for which the Hamiltonian is given by:
 
 $$
-H = \hbar \omega_c a^\dagger a + \frac{1}{2} \hbar \omega_a \sigma_z + \hbar g (a^\dagger + a)(\sigma_- + \sigma+) 
+H = \hbar \omega_c a^\dagger a + \frac{1}{2} \hbar \omega_a \sigma_z + \hbar g (a^\dagger + a)(\sigma_- + \sigma+)
 $$
 
 or in the rotating wave approximation we have:
