@@ -1,0 +1,43 @@
+---
+title: "Rabi Hamiltonian (QuTiP)"
+author: "CAIPE-sim"
+format:
+  revealjs:
+    slide-number: true
+    incremental: false
+    scrollable: true
+    smaller: true
+editor: visual
+---
+
+## Hamiltonian for the Two Level System
+
+In the two level system we are using the Jaynes-Cumming model for which the Hamiltonian is given by:
+
+$$
+H = \hbar \omega_c a^\dagger a + \frac{1}{2} \hbar \omega_a \sigma_z + \hbar g (a^\dagger + a)(\sigma_- + \sigma+)
+$$
+
+or in the rotating wave approximation we have:
+
+$$
+H = \hbar \omega_c a^\dagger a + \frac{1}{2} \hbar \omega_a \sigma_z + \hbar g (a^\dagger \sigma_- + a \sigma_+)
+$$
+
+where
+
+-   $\omega_c$  - is the frequency of the cavity
+
+-   $\omega_a$ - is the frequency of the atom
+
+-   $g$ - is the interaction strength between the two levels
+
+-   $\sigma_+$ and $\sigma_-$ are the raising and lowering operators respectively, this can be understood as the operators that take a system to the excited state and back down to the ground state respectively
+
+-    $\sigma_z$ is the atomic inversion operator, that is the operator that tells us how the populations of each state differ (would be nice to double check this, I am going off intuition have not found a solid description)
+
+-   $a$ and $a^\dagger$ are photon creation and annihilation operators, these are operators increase / lower the number of particles (in this case photons) in a given state by 1
+
+    We can then go and put everything together term by term, starting with the first term the quantity $\hbar \omega$ corresponds to the energy of a photon and the creation/annihilation operators project that energy onto the amount of particles in each state, this is effectively the energy that corresponds to the cavity that we are working in $H_{cavity}$. The second term is similar in the sense that it is an energy projection but this time it projects the energy of the atom (via photon energy of the interaction between the two states) onto the populations of each state in our atom, in other words this term projects the energy corresponding to the atom to the states of the atom, this is the energy of the atom $H_{atom}$. Together these terms are commonly referred to as $H_0$,"free Hamiltonian" or the "unperturbed Hamiltonian" because it described the system before any interactions go on, which brings us the the third term in our Hamiltonian equation. In the last term we'll notice that rather than a frequency we have a coupling strength, projected onto both photon creation/annihilation and the raising and lowering operators. The presence of creation/annihilation operators tell us that we are changing the amount of particles in our two states and the raising and lowering operators tell us that we are moving particles between states, putting them together tells us that we are changing populations in states all weighed by the outer term dominated by the coupling strength. In other words, the third term is describing the interaction between the cavity and the atom, this term is typically referred to as the interaction Hamiltonian $H_{interaction}$. . All together the Hamiltonian tells us about the energies in each state at a snapshot in time.
+
+## Hamiltonian for the Three Level System
