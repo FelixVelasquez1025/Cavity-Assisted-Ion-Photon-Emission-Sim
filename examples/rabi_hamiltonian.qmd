@@ -1,8 +1,13 @@
 ---
 title: "Rabi Hamiltonian (QuTiP)"
-author: "CAIPE-sim"
+author: "Felix Velasquez"
 format:
   revealjs:
+      css: rabi_hamiltonian.css
+      embed-resources: true
+      incremental: true
+      self-contained-math: true
+  pptx:
     slide-number: true
     incremental: false
     scrollable: true
@@ -24,9 +29,9 @@ $$
 H = \hbar \omega_c a^\dagger a + \frac{1}{2} \hbar \omega_a \sigma_z + \hbar g (a^\dagger \sigma_- + a \sigma_+)
 $$
 
-where
+## Variable Explanations {.compact}
 
--   $\omega_c$  - is the frequency of the cavity
+-   $\omega_c$ - is the frequency of the cavity
 
 -   $\omega_a$ - is the frequency of the atom
 
@@ -34,10 +39,41 @@ where
 
 -   $\sigma_+$ and $\sigma_-$ are the raising and lowering operators respectively, this can be understood as the operators that take a system to the excited state and back down to the ground state respectively
 
--    $\sigma_z$ is the atomic inversion operator, that is the operator that tells us how the populations of each state differ (would be nice to double check this, I am going off intuition have not found a solid description)
+-   $\sigma_z$ is the atomic inversion operator, that is the operator that tells us how the populations of each state differ (would be nice to double check this, I am going off intuition have not found a solid description)
 
 -   $a$ and $a^\dagger$ are photon creation and annihilation operators, these are operators increase / lower the number of particles (in this case photons) in a given state by 1
+
+
+## Hamiltonian Explained {.compact}
 
     We can then go and put everything together term by term, starting with the first term the quantity $\hbar \omega$ corresponds to the energy of a photon and the creation/annihilation operators project that energy onto the amount of particles in each state, this is effectively the energy that corresponds to the cavity that we are working in $H_{cavity}$. The second term is similar in the sense that it is an energy projection but this time it projects the energy of the atom (via photon energy of the interaction between the two states) onto the populations of each state in our atom, in other words this term projects the energy corresponding to the atom to the states of the atom, this is the energy of the atom $H_{atom}$. Together these terms are commonly referred to as $H_0$,"free Hamiltonian" or the "unperturbed Hamiltonian" because it described the system before any interactions go on, which brings us the the third term in our Hamiltonian equation. In the last term we'll notice that rather than a frequency we have a coupling strength, projected onto both photon creation/annihilation and the raising and lowering operators. The presence of creation/annihilation operators tell us that we are changing the amount of particles in our two states and the raising and lowering operators tell us that we are moving particles between states, putting them together tells us that we are changing populations in states all weighed by the outer term dominated by the coupling strength. In other words, the third term is describing the interaction between the cavity and the atom, this term is typically referred to as the interaction Hamiltonian $H_{interaction}$. . All together the Hamiltonian tells us about the energies in each state at a snapshot in time.
 
 ## Hamiltonian for the Three Level System
+
+Taking the same approach of separating our Hamiltonian by component we can split the three level system, into its components with the following components:
+
+-   $H_0 = \hbar \left(     \Delta_{\text{driv}} \hat{\sigma}_{gg}    + \Delta_{\text{rep}} \hat{\sigma}_{ss}    + (\Delta_c - \Delta_{\text{rep}})\hat{a}^\dagger \hat{a}\right)$
+
+-   $H_{drive}  =     \frac{\hbar \Omega_{\text{driv}}}{2} \hat{\sigma}_{ge}     + \text{h.c.}$
+
+-   $H_{repump}  =     \frac{\hbar \Omega_{\text{repump}}}{2} \hat{\sigma}_{se}     + \text{h.c.}$
+
+-   $H_{coupling}  = \hbar g \left( \hat{a}^\dagger \hat{\sigma}_{se}     + \hat{a} \hat{\sigma}_{es} \right)$
+
+## Variable Explanations {.compact}
+
+-   $\Delta_x$ - is the detuning of component x (ie either the driving laser, repumping laser or the cavity)
+
+-   $\Omega_x$ - is the Rabi frequency of component x (ie either the driving laser or repumping laser)
+
+-   $\sigma_{xy}$ - is the detuning of operator that takes us from level x to y where x,y are the ground state, excited state, and the metastable state
+
+-   $h.c$ - is the Hermetian conjugate of an operator
+
+Our full Hamiltonian that we feed into qutip is given by:
+
+$H = H_0 + H_{drive} + H_{repump} + H_{coupling}$
+
+## Hamiltonian Explained {.compact}
+
+Taking a look at each component of our Hamiltonian we'll first notice that our unperturbed Hamiltonian has changed, rather than just dealing with energy terms we are now using detunings and the form of the equation is different. This is a product of working in the rotating frame approximation, this term can still be understood as the energy of each state being projected onto the state by its corresponding operator and the cavity energy term projected onto the creation/annihilation operators. The next two terms for the driving Hamiltonian and Repumping Hamiltonian (which represent the energies of the transition) projected onto the operators that represent their corresponding transitions. The Hermetian conjugate is also included to include the reverse process. Our interaction Hamiltonian term has changed to the coupling Hamiltonian but you'll notice the form doesn't change much, in fact it is nearly the same but rather than the raising and lowering operators we had in the two level system we now have operators which take us from the metastable state to the excited state. This term controls the amount of photons in that interaction, which deals with emission and absorption of cavity photons, this is the three level system version of our interaction Hamiltonian in two level case.

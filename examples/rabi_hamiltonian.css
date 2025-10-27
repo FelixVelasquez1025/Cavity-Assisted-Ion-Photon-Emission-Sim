@@ -1,0 +1,16 @@
+.reveal section.compact {
+  /* Smaller base font for compact slides */
+  --r-main-font-size: 26px; /* default is ~36px in Quarto */
+}
+
+.reveal section.compact h1 { font-size: 1.6em; }
+.reveal section.compact h2 { font-size: 1.3em; }
+.reveal section.compact h3 { font-size: 1.15em; }
+
+/* Slightly tighter spacing for lists and paragraphs on compact slides */
+.reveal section.compact p,
+.reveal section.compact li { line-height: 1.2; }
+
+/* Keep math a touch smaller as well */
+.reveal section.compact .math { font-size: 0.95em; }
+
