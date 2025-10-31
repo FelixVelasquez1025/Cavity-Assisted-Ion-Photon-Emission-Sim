@@ -19,10 +19,20 @@ from atomic_physics.ions.ca40 import Ca40  # type: ignore
 
 Level = str  # 'S', 'P', or 'D'
 
-# Physical constants (SI) from SciPy
-HBAR = consts.hbar
-MU_B = consts.physical_constants["Bohr magneton"][0]
+# Physical constants
+# We work in angular-frequency units (rad/s) and set ħ = 1.
+# Use μB/ħ so g_J μB B has units of rad/s when B is in Tesla.
+HBAR = 1.0
+MU_B = consts.physical_constants["Bohr magneton"][0] / consts.hbar
 
+# Rabi frequencies (rad/s) for fixed-amplitude lasers
+Rabi_SP = 21.62e6 * 2 * np.pi  # 397 nm transition
+Rabi_DP = 1.48e6 * 2 * np.pi   # 866 nm transition 
+
+# Lande g-factors
+g_s = 2.0022664
+
+#This maps the m_j states to integer indicies so we can build loops with correct indexing later on 
 def state_index(level: Level, m: float) -> int:
     if level == 'S':
         return 0 if m == -0.5 else 1
@@ -33,6 +43,7 @@ def state_index(level: Level, m: float) -> int:
     raise ValueError(f"Unknown state ({level}, {m})")
 
 
+# This maps Clebsh-Gordan coefficients to a Tuple which can then iterate over to get dipole moments for transitions 
 def cgc_lists() -> Dict[str, Dict[int, List[Tuple[Tuple[Level, float], Tuple[Level, float], float]]]]:
     """Clebsch-Gordan coefficients for S↔P and D↔P transitions grouped by Δm=q."""
     SP = {
@@ -60,31 +71,38 @@ def cgc_lists() -> Dict[str, Dict[int, List[Tuple[Tuple[Level, float], Tuple[Lev
     return {'SP': SP, 'DP': DP}
 
 
+# This computes the change in m_j for a given transition, this is used to determine the the transition type, and the polarization of a transition
 def delta_mj(m_lower: float, m_upper: float) -> int:
-    """Return Δm_j = m_upper − m_lower in {-1,0,+1} (rounded to nearest int)."""
+    """Return Δm_j = m_upper - m_lower in {-1,0,+1} (rounded to nearest int)."""
     return int(round(m_upper - m_lower))
 
-
+# The way we are dealing with different polarizations is to create sepereate systems for each component. (Think about how gravity only effects vertical motion, not horizontal motion)
+# This dictionary maps the change in m_j to its corresponding polarization. We can use this to build separate Hamiltonians for each polarization component.
 _q_to_label = {+1: 'left', 0: 'pi', -1: 'right'}
 
 
-
-
-
+# This one just returns the index of a state in the local basis
 def _index_from_local(level: Level, m: float) -> int:
     return state_index(level, m)
 
 
+
+# This function builds H_SP and H_DP Hamiltonians for each polarization system
 def _build_systems(
     pair: str,
-    get_omega: Callable[[Level, float, Level, float, int], float],
+    Omega_value: float,
     index_of: Callable[[Level, float], int],
     dim: int,
 ) -> Dict[str, Qobj]:
     """Core builder: accumulate three Hamiltonians (left, pi, right).
 
-    For each CGC-listed transition A,m_A → B,m_B, compute q=Δm, fetch Ω,
-    and add ½ Ω · CGC (|u><l| + h.c.) into the appropriate system.
+    For each CGC-listed transition A,m_A → B,m_B, compute q=Δm and
+    add ½ Ω · CGC (|u><l| + h.c.) into the appropriate system using
+    the fixed Rabi rate Ω provided in Omega_value.
+
+    pair is 'SP' or 'DP' to select which transitions to include.
+    index_of maps (level, m) to local basis index.
+    dim is the local basis dimension (8).
     """
     systems = {name: Qobj(np.zeros((dim, dim), dtype=complex)) for name in ('left', 'pi', 'right')}
     data = cgc_lists()[pair]
@@ -94,7 +112,7 @@ def _build_systems(
             q = delta_mj(m_l, m_u)
             if q not in (-1, 0, +1):
                 continue
-            Omega = float(get_omega(lower[0], m_l, upper[0], m_u, q))
+            Omega = float(Omega_value)
             if Omega == 0.0:
                 continue
             li = index_of(lower[0], m_l)
@@ -103,35 +121,26 @@ def _build_systems(
             ket_u = basis(dim, ui)
             sigma = ket_u * ket_l.dag()
             label = _q_to_label[q]
-            systems[label] = systems[label] + 0.5 * Omega * cgc * (sigma + sigma.dag())
+            systems[label] = systems[label] + 0.5 * HBAR * Omega * cgc * (sigma + sigma.dag())
     return systems
 
 
 
 
+# Builds H_SP
+def H_SP_systems_constant(dim: int = 8) -> Dict[str, Qobj]:
+    return _build_systems('SP', float(Rabi_SP) * HBAR, _index_from_local, dim)
 
-def H_SP_systems_constant(Omega_by_q: Dict[int, float], dim: int = 8) -> Dict[str, Qobj]:
-    """Fallback: constant Ω per spherical component in the local 8-state basis."""
-
-    def get_omega(_L: Level, _mL: float, _U: Level, _mU: float, q: int) -> float:
-        return float(Omega_by_q.get(q, 0.0))
-
-    return _build_systems('SP', get_omega, _index_from_local, dim)
-
-
-def H_DP_systems_constant(Omega_by_q: Dict[int, float], dim: int = 8) -> Dict[str, Qobj]:
-    """Fallback: constant Ω per spherical component in the local 8-state basis."""
-
-    def get_omega(_L: Level, _mL: float, _U: Level, _mU: float, q: int) -> float:
-        return float(Omega_by_q.get(q, 0.0))
-
-    return _build_systems('DP', get_omega, _index_from_local, dim)
+# Builds H_DP
+def H_DP_systems_constant(dim: int = 8) -> Dict[str, Qobj]:
+    return _build_systems('DP', float(Rabi_DP) * HBAR, _index_from_local, dim)
 
 
+# This builds sigma componenets for H_SP and H_DP
 def transition_sigma_components(pair: str, dim: int = 8) -> Dict[int, Qobj]:
     """Build non-Hermitian atomic operators S_q = Σ_{Δm=q} CGC |upper><lower|.
 
-    This is a local-basis helper (uses state_index) for composing Eq. 2.4.12–2.4.15
+    This is a local-basis helper (uses state_index) for composing Eq. 2.4.12-2.4.15
     pieces. It does not rely on any external ion object.
     """
     zero = Qobj(np.zeros((dim, dim), dtype=complex))
@@ -153,7 +162,6 @@ def transition_sigma_components(pair: str, dim: int = 8) -> Dict[int, Qobj]:
             comps[k] = Qobj(np.zeros((dim, dim), dtype=complex))
     return comps
 
-
 def cavity_sigma_DP_components(dim: int = 8) -> Dict[int, Qobj]:
     """Non-Hermitian atomic operators for the cavity D↔P coupling.
 
@@ -163,7 +171,7 @@ def cavity_sigma_DP_components(dim: int = 8) -> Dict[int, Qobj]:
     return {+1: S.get(+1, Qobj(np.zeros((dim, dim), dtype=complex))),
             -1: S.get(-1, Qobj(np.zeros((dim, dim), dtype=complex)))}
 
-
+# This builds H_a and H_b for left and right polarizations
 def H_cavity_DP_modes(g: float, N_a: int, N_b: int, dim_atom: int = 8) -> Dict[str, Qobj]:
     """Eq. 2.4.14-2.4.15: build H_a and H_b for two cavity polarizations.
 
@@ -176,7 +184,6 @@ def H_cavity_DP_modes(g: float, N_a: int, N_b: int, dim_atom: int = 8) -> Dict[s
     """
     I_a = qeye(N_a)
     I_b = qeye(N_b)
-    I_atom = qeye(dim_atom)
     a = destroy(N_a)
     b = destroy(N_b)
 
@@ -184,17 +191,16 @@ def H_cavity_DP_modes(g: float, N_a: int, N_b: int, dim_atom: int = 8) -> Dict[s
     S_p = comps[+1]
     S_m = comps[-1]
 
-    H_a = g * (tensor(a, I_b, S_p) + tensor(a.dag(), I_b, S_p.dag()))
-    H_b = g * (tensor(I_a, b, S_m) + tensor(I_a, b.dag(), S_m.dag()))
+    H_a = HBAR* g * (tensor(a, I_b, S_p) + tensor(a.dag(), I_b, S_p.dag()))
+    H_b = HBAR * g * (tensor(I_a, b, S_m) + tensor(I_a, b.dag(), S_m.dag()))
     return {'left': H_a, 'right': H_b}
 
 
-
-
-def H_laser_systems_constant(Om_SP_by_q: Dict[int, float], Om_DP_by_q: Dict[int, float], dim: int = 8) -> Dict[str, Qobj]:
-    """Sum H_SP and H_DP for each polarization system with constant Ω per q."""
-    Hsp = H_SP_systems_constant(Om_SP_by_q, dim=dim)
-    Hdp = H_DP_systems_constant(Om_DP_by_q, dim=dim)
+# This builds the hamiltonian contribution from the lasers which is H_l = H_SP + H_DP
+def H_laser_systems_constant(dim: int = 8) -> Dict[str, Qobj]:
+    """Sum H_SP and H_DP for each polarization system with fixed Rabi rates."""
+    Hsp = H_SP_systems_constant(dim=dim)
+    Hdp = H_DP_systems_constant(dim=dim)
     return {
         'left': Hsp.get('left') + Hdp.get('left'),
         'pi':   Hsp.get('pi') + Hdp.get('pi'),
@@ -202,6 +208,7 @@ def H_laser_systems_constant(Om_SP_by_q: Dict[int, float], Om_DP_by_q: Dict[int,
     }
 
 
+# Builds the interaction Hamiltonians between the cavity and the atomic states H_a and H_b and adds it to the laser-atom Hamiltonians for the total interaction Hamiltonian
 def H_interaction_with_cavity(
     H_laser_atom: Dict[str, Qobj],
     g: float,
@@ -237,36 +244,11 @@ def H0_cavity(delta_c: float, delta_rep: float, N_a: int, N_b: int, dim_atom: in
     Hc = coeff * (tensor(a.dag() * a, qeye(N_b), I_atom) + tensor(qeye(N_a), b.dag() * b, I_atom))
     return Hc
 
-
-
-
-
-def add_bare_to_full_systems(
-    H_systems: Dict[str, Qobj],
-    H_S: Qobj,
-    H_D: Qobj,
-    delta_c: float,
-    delta_rep: float,
-    N_a: int,
-    N_b: int,
-) -> Dict[str, Qobj]:
-    """Add bare ion + bare cavity Hamiltonians to each polarization system."""
-    dim_atom = H_S.shape[0]
-    Ia = qeye(N_a)
-    Ib = qeye(N_b)
-    H_bare_atom = tensor(Ia, Ib, H_S + H_D)
-    H_cav = H0_cavity(delta_c, delta_rep, N_a, N_b, dim_atom)
-    out = {}
-    for key, H in H_systems.items():
-        out[key] = H + H_bare_atom + H_cav
-    return out
-
-
 # Bare-ion Hamiltonians (Eqs. 2.4.5 and 2.4.6)
-def eq_2_4_5_H_S(delta_drive: float, B_T: float, g_S: float = 2.0022664, dim: int = 8) -> Qobj:
-    """S-manifold diagonal Hamiltonian in the rotating frame.
+def eq_2_4_5_H_S(delta_drive: float, B_T: float, g_S: float = g_s, dim: int = 8) -> Qobj:
+    """S-manifold diagonal Hamiltonian in the rotating frame. 7
 
-    H_S = Σ_{m=±1/2} (Δ_driv + g_S μ_B B m / ħ) |S,m><S,m|
+    H_S = Σ_{m=±1/2} (Δ_driv + g_S μ_B B m) |S,m><S,m|  (μ_B ≡ μB/ħ)
     """
     H = Qobj(np.zeros((dim, dim), dtype=complex))
     for m in (-0.5, +0.5):
@@ -276,11 +258,10 @@ def eq_2_4_5_H_S(delta_drive: float, B_T: float, g_S: float = 2.0022664, dim: in
         H += E * (ket * ket.dag())
     return H
 
-
 def eq_2_4_6_H_D(delta_rep: float, B_T: float, g_D: float, dim: int = 8) -> Qobj:
     """D-manifold diagonal Hamiltonian in the rotating frame.
 
-    H_D = Σ_{m∈{-3/2,-1/2,+1/2,+3/2}} (Δ_rep + g_D μ_B B m / ħ) |D,m><D,m|
+    H_D = Σ_{m∈{-3/2,-1/2,+1/2,+3/2}} (Δ_rep + g_D μ_B B m) |D,m><D,m|  (μ_B ≡ μB/ħ)
     """
     H = Qobj(np.zeros((dim, dim), dtype=complex))
     for m in (-1.5, -0.5, +0.5, +1.5):
@@ -291,16 +272,35 @@ def eq_2_4_6_H_D(delta_rep: float, B_T: float, g_D: float, dim: int = 8) -> Qobj
     return H
 
 
-# Add bare-ion Hamiltonians to interactive Hamiltonian for each system 
-def add_bare_ion_to_systems(
-    systems: Dict[str, Qobj],
+# Adds all of of the terms together to get the full Hamiltonian
+def add_bare_terms_to_systems(
+    H_systems: Dict[str, Qobj],
     H_S: Qobj,
     H_D: Qobj,
+    delta_c: float | None = None,
+    delta_rep: float | None = None,
+    N_a: int | None = None,
+    N_b: int | None = None,
 ) -> Dict[str, Qobj]:
-    """Add the polarization-independent bare Hamiltonians to each system."""
+    """Add bare-ion terms and, if provided, bare-cavity terms to each system.
+
+    - Always adds H_S + H_D to every polarization-resolved Hamiltonian in
+      `H_systems`. If `N_a`, `N_b`, `delta_c`, and `delta_rep` are provided,
+      also adds the two-mode cavity term H0_cavity.
+    """
     out: Dict[str, Qobj] = {}
-    for key, H in systems.items():
-        out[key] = H + H_S + H_D
+    add_cavity = (None not in (delta_c, delta_rep, N_a, N_b))
+    if add_cavity:
+        dim_atom = H_S.shape[0]
+        Ia = qeye(int(N_a))
+        Ib = qeye(int(N_b))
+        H_bare_atom = tensor(Ia, Ib, H_S + H_D)
+        H_cav = H0_cavity(float(delta_c), float(delta_rep), int(N_a), int(N_b), dim_atom)
+        for key, H in H_systems.items():
+            out[key] = H + H_bare_atom + H_cav
+    else:
+        for key, H in H_systems.items():
+            out[key] = H + H_S + H_D
     return out
 
 
@@ -336,9 +336,6 @@ def interactive_populations():
         system='pi',
     )
 
-    # Fixed Rabi frequencies for demo (rad/s)
-    Om_SP = {+1: 0.0, 0: 2 * np.pi * 5e6, -1: 0.0}
-    Om_DP = {+1: 0.0, 0: 2 * np.pi * 2e6, -1: 2 * np.pi * 2e6}
 
     # Initial atomic state |S, +1/2>
     psi0_atom = basis(8, state_index('S', +0.5))
@@ -351,7 +348,7 @@ def interactive_populations():
         ddrv = 2 * np.pi * params['delta_drive_MHz'] * 1e6
         drep = 2 * np.pi * params['delta_rep_MHz'] * 1e6
 
-        H_spdp = H_laser_systems_constant(Om_SP, Om_DP, dim=8)
+        H_spdp = H_laser_systems_constant(dim=8)
         H_S = eq_2_4_5_H_S(ddrv, B_T, params['g_S'], dim=8)
         H_D = eq_2_4_6_H_D(drep, B_T, params['g_D'], dim=8)
 
@@ -363,7 +360,7 @@ def interactive_populations():
         g = 2 * np.pi * s_gcav.val * 1e6
         dc = 2 * np.pi * s_dcav.val * 1e6
         H_lift = H_interaction_with_cavity(H_spdp, g=g, N_a=N_a, N_b=N_b)
-        H_full = add_bare_to_full_systems(H_lift, H_S, H_D, dc, drep, N_a, N_b)
+        H_full = add_bare_terms_to_systems(H_lift, H_S, H_D, dc, drep, N_a, N_b)
         H = H_full[rb_sys.value_selected]
         Ia, Ib = qeye(N_a), qeye(N_b)
         psi0 = tensor(basis(N_a, 0), basis(N_b, 0), psi0_atom)
