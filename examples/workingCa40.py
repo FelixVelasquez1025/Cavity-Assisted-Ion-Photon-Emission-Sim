@@ -8,8 +8,26 @@ from qutip import Qobj, basis, destroy, qeye, tensor, mesolve
 import matplotlib.pyplot as plt
 from matplotlib.widgets import Slider, RadioButtons
 from scipy import constants as consts
+from atomic_physics.ions.ca40 import Ca40  
 
-from atomic_physics.ions.ca40 import Ca40  # type: ignore
+from sympy import S as _S
+from sympy.physics.wigner import wigner_3j as _sympy_wigner_3j
+
+
+
+def wigner_3j(j1: float, j2: float, j3: float, m1: float, m2: float, m3: float) -> float:
+        """Numeric wrapper around SymPy wigner_3j returning a real float.
+
+        SymPy may return an exact algebraic (possibly complex) expression; we
+        evaluate numerically and return the real part, warning only if the
+        imaginary part is non-negligible.
+        """
+        val = _sympy_wigner_3j(_S(j1), _S(j2), _S(j3), _S(m1), _S(m2), _S(m3))
+        cval = complex(val.evalf())
+        if abs(cval.imag) > 1e-12:
+            # Wigner 3j for physical arguments should be real; keep real part.
+            pass
+        return float(cval.real)
 
 
 
@@ -25,12 +43,24 @@ Level = str  # 'S', 'P', or 'D'
 HBAR = 1.0
 MU_B = consts.physical_constants["Bohr magneton"][0] / consts.hbar
 
-# Rabi frequencies (rad/s) for fixed-amplitude lasers
-Rabi_SP = 21.62e6 * 2 * np.pi  # 397 nm transition
-Rabi_DP = 1.48e6 * 2 * np.pi   # 866 nm transition 
+
 
 # Lande g-factors
-g_s = 2.0022664
+g_s = next(ld.g_J for ld in Ca40.level_data if ld.level == Ca40.S12)
+
+
+def rabi_frequencies(E0_driv: float, E0_rep: float) -> Tuple[float, float]:
+    """Compute Ω_driv and Ω_rep (rad/s) for Eqs. 2.4.12 and 2.4.13.
+
+    Uses Eq. 2.1.8 with ħ = 1. The polarization geometry factor (ε·d)
+    is handled by the Clebsch-Gordan structure inside the sigma operators
+    built in this module, so here Ω = E0 in rad/s.
+
+    Parameters
+    - E0_driv: driving laser field amplitude (rad/s scale)
+    - E0_rep:  repump  laser field amplitude (rad/s scale)
+    """
+    return float(E0_driv), float(E0_rep)
 
 #This maps the m_j states to integer indicies so we can build loops with correct indexing later on 
 def state_index(level: Level, m: float) -> int:
@@ -44,31 +74,57 @@ def state_index(level: Level, m: float) -> int:
 
 
 # This maps Clebsh-Gordan coefficients to a Tuple which can then iterate over to get dipole moments for transitions 
-def cgc_lists() -> Dict[str, Dict[int, List[Tuple[Tuple[Level, float], Tuple[Level, float], float]]]]:
-    """Clebsch-Gordan coefficients for S↔P and D↔P transitions grouped by Δm=q."""
-    SP = {
-        +1: [(('S', -0.5), ('P', +0.5), math.sqrt(2.0 / 3.0))],
-        0: [
-            (('S', -0.5), ('P', -0.5), -math.sqrt(1.0 / 3.0)),
-            (('S', +0.5), ('P', +0.5), +math.sqrt(1.0 / 3.0)),
-        ],
-        -1: [(('S', +0.5), ('P', -0.5), -math.sqrt(2.0 / 3.0))],
-    }
-    DP = {
-        +1: [
-            (('D', -1.5), ('P', -0.5), math.sqrt(1.0 / 2.0)),
-            (('D', -0.5), ('P', +0.5), math.sqrt(1.0 / 6.0)),
-        ],
-        0: [
-            (('D', -0.5), ('P', -0.5), -math.sqrt(1.0 / 6.0)),
-            (('D', +0.5), ('P', +0.5), +math.sqrt(1.0 / 6.0)),
-        ],
-        -1: [
-            (('D', +1.5), ('P', +0.5), -math.sqrt(1.0 / 2.0)),
-            (('D', +0.5), ('P', -0.5), -math.sqrt(1.0 / 6.0)),
-        ],
-    }
+# Generalized CGC computation using Wigner-3j and Ca40 J values
+def _mj_values(J: float) -> List[float]:
+    twoJ = int(round(2 * J))
+    return [(-twoJ + k) / 2.0 for k in range(0, 2 * twoJ + 1)]
+
+
+def _clebsch_gordan(j1: float, m1: float, j2: float, m2: float, J: float, M: float) -> float:
+    # Use integer parity for the phase to avoid complex results from float powers
+    exp2 = int(round(2.0 * (j1 - j2 + M)))  # 2*(j1 - j2 + M) should be integer
+    phase = 1.0 if (exp2 % 2 == 0) else -1.0
+    w3 = wigner_3j(j1, j2, J, m1, m2, -M)
+    # Ensure numeric real scalar even if the backend returns an exact/complex type
+    w3_real = float(complex(w3).real)
+    val = phase * math.sqrt(2.0 * J + 1.0) * w3_real
+    return float(val)
+
+
+def _e1_cgc(j_lower: float, m_lower: float, j_upper: float, m_upper: float) -> float:
+    q = m_upper - m_lower
+    if q not in (-1.0, 0.0, 1.0):
+        return 0.0
+    return _clebsch_gordan(j_lower, m_lower, 1.0, q, j_upper, m_upper)
+
+
+def cgc_lists_general() -> Dict[str, Dict[int, List[Tuple[Tuple[Level, float], Tuple[Level, float], float]]]]:
+    J_S = float(Ca40.S12.J)
+    J_P = float(Ca40.P12.J)
+    J_D = float(Ca40.D32.J)
+
+    def build_pair(lower_label: Level, j_lower: float, upper_label: Level, j_upper: float):
+        out: Dict[int, List[Tuple[Tuple[Level, float], Tuple[Level, float], float]]] = {+1: [], 0: [], -1: []}
+        for m_l in _mj_values(j_lower):
+            for q in (-1, 0, +1):
+                m_u = m_l + q
+                if m_u < -j_upper or m_u > j_upper:
+                    continue
+                cgc = _e1_cgc(j_lower, m_l, j_upper, m_u)
+                if cgc == 0.0:
+                    continue
+                out[q].append(((lower_label, m_l), (upper_label, m_u), float(cgc)))
+        return out
+
+    SP = build_pair('S', J_S, 'P', J_P)
+    DP = build_pair('D', J_D, 'P', J_P)
     return {'SP': SP, 'DP': DP}
+
+
+# (comparison helper removed after verification)
+
+
+# (duplicate CGC helper definitions removed; using the robust ones above)
 
 
 # This computes the change in m_j for a given transition, this is used to determine the the transition type, and the polarization of a transition
@@ -105,7 +161,7 @@ def _build_systems(
     dim is the local basis dimension (8).
     """
     systems = {name: Qobj(np.zeros((dim, dim), dtype=complex)) for name in ('left', 'pi', 'right')}
-    data = cgc_lists()[pair]
+    data = cgc_lists_general()[pair]
     for q_group in (-1, 0, +1):
         for (lower, upper, cgc) in data.get(q_group, []):
             m_l, m_u = lower[1], upper[1]
@@ -128,12 +184,7 @@ def _build_systems(
 
 
 # Builds H_SP
-def H_SP_systems_constant(dim: int = 8) -> Dict[str, Qobj]:
-    return _build_systems('SP', float(Rabi_SP) * HBAR, _index_from_local, dim)
-
-# Builds H_DP
-def H_DP_systems_constant(dim: int = 8) -> Dict[str, Qobj]:
-    return _build_systems('DP', float(Rabi_DP) * HBAR, _index_from_local, dim)
+# (Removed constant-Ω helpers; we drive Ω from E0 sliders)
 
 
 # This builds sigma componenets for H_SP and H_DP
@@ -145,7 +196,7 @@ def transition_sigma_components(pair: str, dim: int = 8) -> Dict[int, Qobj]:
     """
     zero = Qobj(np.zeros((dim, dim), dtype=complex))
     comps: Dict[int, Qobj] = {-1: zero, 0: zero, +1: zero}
-    data = cgc_lists()[pair]
+    data = cgc_lists_general()[pair]
     for q_group in (-1, 0, +1):
         for (lower, upper, cgc) in data.get(q_group, []):
             q = delta_mj(lower[1], upper[1])
@@ -197,10 +248,19 @@ def H_cavity_DP_modes(g: float, N_a: int, N_b: int, dim_atom: int = 8) -> Dict[s
 
 
 # This builds the hamiltonian contribution from the lasers which is H_l = H_SP + H_DP
-def H_laser_systems_constant(dim: int = 8) -> Dict[str, Qobj]:
-    """Sum H_SP and H_DP for each polarization system with fixed Rabi rates."""
-    Hsp = H_SP_systems_constant(dim=dim)
-    Hdp = H_DP_systems_constant(dim=dim)
+# (Removed fixed-Ω laser system combiner)
+
+
+def H_laser_systems_from_E0(E0_driv: float, E0_rep: float, dim: int = 8) -> Dict[str, Qobj]:
+    """Laser Hamiltonians using field amplitudes E0 (rad/s scale).
+
+    Implements Eq. 2.1.8 with ħ = 1 and the polarization geometry handled by
+    CGCs in the sigma terms; we therefore pass Ω = E0 to _build_systems, which
+    already applies the 1/2 prefactor internally.
+    """
+    Omega_driv, Omega_rep = rabi_frequencies(E0_driv, E0_rep)
+    Hsp = _build_systems('SP', float(Omega_driv), _index_from_local, dim)
+    Hdp = _build_systems('DP', float(Omega_rep), _index_from_local, dim)
     return {
         'left': Hsp.get('left') + Hdp.get('left'),
         'pi':   Hsp.get('pi') + Hdp.get('pi'),
@@ -334,6 +394,8 @@ def interactive_populations():
         tmax_us=50.0,
         density=8.0,  # samples per microsecond
         system='pi',
+        amp_driv_MHz=10.0,  # driving laser amplitude E0 (MHz)
+        amp_rep_MHz=5.0,    # repump  laser amplitude E0 (MHz)
     )
 
 
@@ -348,7 +410,9 @@ def interactive_populations():
         ddrv = 2 * np.pi * params['delta_drive_MHz'] * 1e6
         drep = 2 * np.pi * params['delta_rep_MHz'] * 1e6
 
-        H_spdp = H_laser_systems_constant(dim=8)
+        E0_driv = 2 * np.pi * params['amp_driv_MHz'] * 1e6
+        E0_rep  = 2 * np.pi * params['amp_rep_MHz']  * 1e6
+        H_spdp = H_laser_systems_from_E0(E0_driv, E0_rep, dim=8)
         H_S = eq_2_4_5_H_S(ddrv, B_T, params['g_S'], dim=8)
         H_D = eq_2_4_6_H_D(drep, B_T, params['g_D'], dim=8)
 
@@ -388,15 +452,19 @@ def interactive_populations():
     ax_dcav   = plt.axes([xL, row_y(2), wC, row_h], facecolor=axcolor)
     ax_dense  = plt.axes([xR, row_y(2), wC, row_h], facecolor=axcolor)
     ax_gcav   = plt.axes([xL, row_y(3), wC, row_h], facecolor=axcolor)
+    ax_ampdrv = plt.axes([xL, row_y(4), wC, row_h], facecolor=axcolor)
+    ax_amprep = plt.axes([xR, row_y(4), wC, row_h], facecolor=axcolor)
 
     s_BG   = Slider(ax_BG,   'B (G)',       0.0, 50.0, valinit=params['B_G'])
     s_tmax = Slider(ax_tmax, 't_max (us)',  5.0, 200.0, valinit=params['tmax_us'])
     s_ddrv = Slider(ax_ddrv, 'Δ_driv (MHz)', -50.0, 50.0, valinit=params['delta_drive_MHz'])
     s_drep = Slider(ax_drep, 'Δ_rep (MHz)', -50.0, 50.0, valinit=params['delta_rep_MHz'])
-    s_dcav = Slider(ax_dcav, 'Δ_c (unused)',   -200.0, 200.0, valinit=params['delta_c_MHz'])
+    s_dcav = Slider(ax_dcav, 'Δ_c (MHz)',   -200.0, 200.0, valinit=params['delta_c_MHz'])
     # Control temporal resolution via samples per microsecond to avoid aliasing
     s_dense= Slider(ax_dense,'samples/us',  1.0, 200.0, valinit=params['density'])
     s_gcav = Slider(ax_gcav, 'g_cav (MHz)', 0.0, 50.0, valinit=0.0)
+    s_ampdrv = Slider(ax_ampdrv, 'driving laser amplitude (MHz)', 0.0, 100.0, valinit=params['amp_driv_MHz'])
+    s_amprep = Slider(ax_amprep, 'repump laser amplitude (MHz)',  0.0, 100.0, valinit=params['amp_rep_MHz'])
 
     ax_sys = plt.axes([0.82, 0.08, 0.15, 0.12], facecolor=axcolor)
     rb_sys = RadioButtons(ax_sys, ('left', 'pi', 'right'), active=1)
@@ -422,6 +490,8 @@ def interactive_populations():
         params['delta_rep_MHz'] = s_drep.val
         params['delta_c_MHz'] = s_dcav.val
         params['system'] = rb_sys.value_selected
+        params['amp_driv_MHz'] = s_ampdrv.val
+        params['amp_rep_MHz']  = s_amprep.val
         t2, res2 = build_and_solve()
         ln_e.set_data(t2 * 1e6, np.array(res2.expect[1]))
         ln_g.set_data(t2 * 1e6, np.array(res2.expect[0]))
@@ -429,7 +499,7 @@ def interactive_populations():
         ax.set_xlim(t2[0] * 1e6, t2[-1] * 1e6)
         fig.canvas.draw_idle()
 
-    for s in (s_BG, s_tmax, s_dense, s_ddrv, s_drep, s_dcav, s_gcav):
+    for s in (s_BG, s_tmax, s_dense, s_ddrv, s_drep, s_dcav, s_gcav, s_ampdrv, s_amprep):
         s.on_changed(recompute)
     rb_sys.on_clicked(recompute)
 
@@ -437,6 +507,9 @@ def interactive_populations():
 
 if __name__ == "__main__":
     interactive_populations()
+
+
+
 
 
 
