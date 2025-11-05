@@ -1,22 +1,133 @@
 from __future__ import annotations
 import math
 from typing import Dict, List, Tuple, Callable
+import time
+from functools import wraps
 import numpy as np
-from qutip import Qobj, basis, destroy, qeye, tensor, mesolve
+from qutip import Qobj, basis, destroy, qeye, tensor, mesolve, sesolve, expect
+from qutip.solver import Options
+from qutip import settings as _qutip_settings
+
+from qutip import correlation_2op_1t  
+
+from qutip import correlation_3op_1t  
+
+
+
+
 import matplotlib.pyplot as plt
 from matplotlib.widgets import Slider, RadioButtons
 from scipy import constants as consts
-# Import Yb171 ion definition. If the custom repo is a sibling of this project
+
 import os, sys
-try:
-    from atomic_physics.ions.Yb171 import Yb171  # type: ignore
-except Exception:
-    repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'atomic_physics_wth_Yb171'))
-    if repo_root not in sys.path:
-        sys.path.insert(0, repo_root)
-    from atomic_physics.ions.Yb171 import Yb171  # type: ignore
+
+from atomic_physics.ions.Yb171 import Yb171  # type: ignore
 from sympy import S as _S
 from sympy.physics.wigner import wigner_3j as _sympy_wigner_3j
+
+
+FUNCTION_TIMINGS: Dict[str, Dict[str, float | int]] = {}
+
+
+def _detect_parallel_cpus() -> int:
+    env = os.getenv("QUTIP_NUM_CPUS")
+    if env:
+        try:
+            return max(1, int(env))
+        except ValueError:
+            pass
+    try:
+        count = os.cpu_count() or 1
+    except Exception:
+        count = 1
+    # Leave one core free when possible to keep UI responsive.
+    return max(1, count - 1)
+
+
+DEFAULT_NUM_CPUS = _detect_parallel_cpus()
+
+
+if _qutip_settings is not None:
+    try:
+        if hasattr(_qutip_settings, "num_cpus") and DEFAULT_NUM_CPUS is not None:
+            _qutip_settings.num_cpus = DEFAULT_NUM_CPUS
+    except Exception:
+        pass
+
+
+def solver_options(store_states: bool = False) -> Options:
+    """Solver options tuned for faster convergence without progress bar noise."""
+    return Options(
+        atol=1e-8,
+        rtol=1e-6,
+        nsteps=10000,
+        store_states=store_states,
+        progress_bar=None,
+    )
+
+
+def _zeros_like(arr: np.ndarray) -> np.ndarray:
+    return np.zeros_like(arr, dtype=float)
+
+
+def _set_y_limits(ax, data: np.ndarray | None, default: tuple[float, float], padding: float = 0.1) -> None:
+    """Adjust y-axis bounds with padding while handling empty or degenerate data."""
+    if data is None or data.size == 0:
+        ax.set_ylim(*default)
+        return
+    low = float(np.nanmin(data))
+    high = float(np.nanmax(data))
+    if not np.isfinite(low) or not np.isfinite(high):
+        ax.set_ylim(*default)
+        return
+    span = high - low
+    pad = max(abs(high) * padding, abs(low) * padding, span * padding, 1e-6)
+    if span < 1e-12:
+        ax.set_ylim(low - pad, high + pad)
+    else:
+        ax.set_ylim(low - pad, high + pad)
+
+
+def _record_timing(name: str, elapsed: float) -> None:
+    stats = FUNCTION_TIMINGS.setdefault(name, {'count': 0, 'total': 0.0, 'max': 0.0})
+    stats['count'] += 1
+    stats['total'] += elapsed
+    if elapsed > stats['max']:
+        stats['max'] = elapsed
+
+
+def timed(func=None, *, label: str | None = None):
+    def decorator(fn):
+        name = label or fn.__name__
+
+        @wraps(fn)
+        def wrapper(*args, **kwargs):
+            start = time.perf_counter()
+            try:
+                return fn(*args, **kwargs)
+            finally:
+                elapsed = time.perf_counter() - start
+                _record_timing(name, elapsed)
+
+        return wrapper
+
+    if func is None:
+        return decorator
+    return decorator(func)
+
+
+def print_timing_summary() -> None:
+    if not FUNCTION_TIMINGS:
+        print("Timing summary: no calls recorded.")
+        return
+    print("Timing summary (seconds):")
+    for name in sorted(FUNCTION_TIMINGS):
+        stats = FUNCTION_TIMINGS[name]
+        avg = stats['total'] / stats['count']
+        print(
+            f"  {name}: count={stats['count']}, total={stats['total']:.6f}, "
+            f"avg={avg:.6f}, max={stats['max']:.6f}"
+        )
 
 
 
@@ -65,7 +176,7 @@ def rabi_frequencies(E0_driv: float, E0_rep: float) -> Tuple[float, float]:
     - E0_driv: driving laser field amplitude (rad/s scale)
     - E0_rep:  repump  laser field amplitude (rad/s scale)
     """
-    return float(E0_driv), float(E0_rep)
+    return float(E0_driv)/(2*HBAR), float(E0_rep)/(2*HBAR)
 
 #This maps the m_j states to integer indicies so we can build loops with correct indexing later on 
 def state_index(level: Level, m: float) -> int:
@@ -103,6 +214,7 @@ def _e1_cgc(j_lower: float, m_lower: float, j_upper: float, m_upper: float) -> f
     return _clebsch_gordan(j_lower, m_lower, 1.0, q, j_upper, m_upper)
 
 
+@timed()
 def cgc_lists_general() -> Dict[str, Dict[int, List[Tuple[Tuple[Level, float], Tuple[Level, float], float]]]]:
     J_S = float(Yb171.S12.J)
     J_P = float(Yb171.P12.J)
@@ -149,6 +261,7 @@ def _index_from_local(level: Level, m: float) -> int:
 
 
 # This function builds H_SP and H_DP Hamiltonians for each polarization system
+@timed()
 def _build_systems(
     pair: str,
     Omega_value: float,
@@ -193,6 +306,7 @@ def _build_systems(
 
 
 # This builds sigma componenets for H_SP and H_DP
+@timed()
 def transition_sigma_components(pair: str, dim: int = 8) -> Dict[int, Qobj]:
     """Build non-Hermitian atomic operators S_q = Σ_{Δm=q} CGC |upper><lower|.
 
@@ -218,6 +332,7 @@ def transition_sigma_components(pair: str, dim: int = 8) -> Dict[int, Qobj]:
             comps[k] = Qobj(np.zeros((dim, dim), dtype=complex))
     return comps
 
+@timed()
 def cavity_sigma_DP_components(dim: int = 8) -> Dict[int, Qobj]:
     """Non-Hermitian atomic operators for the cavity D↔P coupling.
 
@@ -228,6 +343,7 @@ def cavity_sigma_DP_components(dim: int = 8) -> Dict[int, Qobj]:
             -1: S.get(-1, Qobj(np.zeros((dim, dim), dtype=complex)))}
 
 # This builds H_a and H_b for left and right polarizations
+@timed()
 def H_cavity_DP_modes(g: float, N_a: int, N_b: int, dim_atom: int = 8) -> Dict[str, Qobj]:
     """Eq. 2.4.14-2.4.15: build H_a and H_b for two cavity polarizations.
 
@@ -256,6 +372,7 @@ def H_cavity_DP_modes(g: float, N_a: int, N_b: int, dim_atom: int = 8) -> Dict[s
 # (Removed fixed-Ω laser system combiner)
 
 
+@timed()
 def H_laser_systems_from_E0(E0_driv: float, E0_rep: float, dim: int = 8) -> Dict[str, Qobj]:
     """Laser Hamiltonians using field amplitudes E0 (rad/s scale).
 
@@ -274,6 +391,7 @@ def H_laser_systems_from_E0(E0_driv: float, E0_rep: float, dim: int = 8) -> Dict
 
 
 # Builds the interaction Hamiltonians between the cavity and the atomic states H_a and H_b and adds it to the laser-atom Hamiltonians for the total interaction Hamiltonian
+@timed()
 def H_interaction_with_cavity(
     H_laser_atom: Dict[str, Qobj],
     g: float,
@@ -301,6 +419,7 @@ def H_interaction_with_cavity(
 
 
 # Bare two-mode cavity Hamiltonian (Eq. 2.4.7): ħ(Δ_c − Δ_rep)(a†a + b†b)
+@timed()
 def H0_cavity(delta_c: float, delta_rep: float, N_a: int, N_b: int, dim_atom: int) -> Qobj:
     coeff = (delta_c - delta_rep)
     I_atom = qeye(dim_atom)
@@ -309,7 +428,116 @@ def H0_cavity(delta_c: float, delta_rep: float, N_a: int, N_b: int, dim_atom: in
     Hc = coeff * (tensor(a.dag() * a, qeye(N_b), I_atom) + tensor(qeye(N_a), b.dag() * b, I_atom))
     return Hc
 
+
+# First-order coherence G^(1) and degree g^(1) for photon generation probability
+@timed()
+def first_order_coherence(
+    H: Qobj,
+    psi0: Qobj,
+    tlist: np.ndarray,
+    c_ops: list | None,
+    a_field: Qobj,
+    taulist: np.ndarray,
+    states: List[Qobj] | None = None,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Compute steady-state G¹(τ), model g¹(τ), and g²(τ).
+
+    - H, psi0, tlist: system Hamiltonian, initial state, times
+    - c_ops: collapse operators (may be empty list)
+    - a_field: field annihilation operator in the full Hilbert space
+    - taulist: delays τ to evaluate
+    Returns three arrays of length len(taulist).
+    """
+    if c_ops is None:
+        c_ops = []
+
+    a_dag = a_field.dag()
+
+    def empty() -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        zeros = _zeros_like(taulist)
+        return zeros, zeros, zeros
+
+    if taulist.size == 0:
+        return empty()
+
+    # Use final state of trajectory (or compute it) for steady-state approximation
+    rho_final: Qobj | None = None
+    if states:
+        last = states[-1]
+        rho_final = last if last.isoper else (last * last.dag())
+    if rho_final is None:
+        sol = sesolve(H, psi0, tlist, options=solver_options(store_states=True))
+        if sol.states:
+            last = sol.states[-1]
+            rho_final = last if last.isoper else (last * last.dag())
+    if rho_final is None:
+        return empty()
+
+    number_op = a_dag * a_field
+    intensity = float(np.real(expect(number_op, rho_final)))
+    if abs(intensity) < 1e-12:
+        return empty()
+
+    if correlation_2op_1t is not None:
+        try:
+            corr = np.asarray(
+                correlation_2op_1t(H, rho_final, taulist, c_ops, a_dag, a_field, 'me'),
+                dtype=complex,
+            )
+        except Exception:
+            corr = None
+    else:
+        corr = None
+
+    if corr is None and correlation_3op_1t is not None:
+        try:
+            I_full = qeye(H.shape[0])
+            corr = np.asarray(
+                correlation_3op_1t(H, rho_final, taulist, c_ops, a_dag, a_field, I_full, 'me'),
+                dtype=complex,
+            )
+        except Exception:
+            corr = None
+
+    if corr is None:
+        print("correlation_fallback_zero path")
+        return empty()
+
+    G1_tau = np.real(corr)
+    g1_tau_raw = corr / intensity
+    tau_c = float(np.trapezoid(np.abs(g1_tau_raw) ** 2, x=taulist))
+    if tau_c <= 0.0:
+        g1_model = _zeros_like(taulist)
+    else:
+        g1_model = np.exp(-(taulist / tau_c) ** 2)
+    print(f"tau_c = {tau_c:.3e} s")
+
+    g2_tau = _zeros_like(taulist)
+    if correlation_3op_1t is not None:
+        try:
+            g2_linear = correlation_3op_1t(
+                H,
+                rho_final,
+                taulist,
+                c_ops,
+                a_dag,
+                number_op,
+                a_field,
+                solver='me',
+            )
+            g2_linear = np.asarray(g2_linear, dtype=complex)
+            denom_g2 = intensity ** 2
+            if denom_g2 > 1e-24:
+                g2_tau = np.real(g2_linear / denom_g2)
+            print("correlation_3op_1t path for g2")
+        except Exception:
+            pass
+
+    return G1_tau, g1_model, g2_tau
+
+
 # Bare-ion Hamiltonians (Eqs. 2.4.5 and 2.4.6)
+@timed()
 def eq_2_4_5_H_S(delta_drive: float, B_T: float, g_S: float = g_s, dim: int = 8) -> Qobj:
     """S-manifold diagonal Hamiltonian in the rotating frame. 7
 
@@ -323,6 +551,7 @@ def eq_2_4_5_H_S(delta_drive: float, B_T: float, g_S: float = g_s, dim: int = 8)
         H += E * (ket * ket.dag())
     return H
 
+@timed()
 def eq_2_4_6_H_D(delta_rep: float, B_T: float, g_D: float, dim: int = 8) -> Qobj:
     """D-manifold diagonal Hamiltonian in the rotating frame.
 
@@ -338,6 +567,7 @@ def eq_2_4_6_H_D(delta_rep: float, B_T: float, g_D: float, dim: int = 8) -> Qobj
 
 
 # Adds all of of the terms together to get the full Hamiltonian
+@timed()
 def add_bare_terms_to_systems(
     H_systems: Dict[str, Qobj],
     H_S: Qobj,
@@ -370,6 +600,7 @@ def add_bare_terms_to_systems(
 
 
 # Convenience: projectors onto manifolds in the local 8-state basis
+@timed()
 def projector_for_indices(indices: List[int], dim: int = 8) -> Qobj:
     P = Qobj(np.zeros((dim, dim), dtype=complex))
     for i in indices:
@@ -381,6 +612,7 @@ def projector_for_indices(indices: List[int], dim: int = 8) -> Qobj:
 
 
 # Interactive UI to explore Yb171+ populations
+@timed()
 def interactive_populations():
     """Interactive UI: sliders for Δ_c, Δ_rep, Δ_driv (MHz) and B (G),
     plus a radio selector for polarization system (left, pi, right).
@@ -401,6 +633,8 @@ def interactive_populations():
         system='pi',
         amp_driv_MHz=10.0,  # driving laser amplitude E0 (MHz)
         amp_rep_MHz=5.0,    # repump  laser amplitude E0 (MHz)
+        tau_max_us=0.5,     # window for first-order coherence (keep small by default)
+        n_tau=40,           # number of tau samples
     )
 
 
@@ -410,6 +644,7 @@ def interactive_populations():
     P_P = projector_for_indices([state_index('P', -0.5), state_index('P', +0.5)], dim=8)
     P_D = projector_for_indices([state_index('D', -1.5), state_index('D', -0.5), state_index('D', +0.5), state_index('D', +1.5)], dim=8)
 
+    @timed(label='build_and_solve')
     def build_and_solve():
         B_T = params['B_G'] * 1e-4
         ddrv = 2 * np.pi * params['delta_drive_MHz'] * 1e6
@@ -430,11 +665,41 @@ def interactive_populations():
         dc = 2 * np.pi * s_dcav.val * 1e6
         H_lift = H_interaction_with_cavity(H_spdp, g=g, N_a=N_a, N_b=N_b)
         H_full = add_bare_terms_to_systems(H_lift, H_S, H_D, dc, drep, N_a, N_b)
-        H = H_full[rb_sys.value_selected]
+        pol = rb_sys.value_selected
+        H = H_full[pol]
         Ia, Ib = qeye(N_a), qeye(N_b)
         psi0 = tensor(basis(N_a, 0), basis(N_b, 0), psi0_atom)
-        res = mesolve(H, psi0, tlist, c_ops=[], e_ops=[tensor(Ia, Ib, P_S), tensor(Ia, Ib, P_P), tensor(Ia, Ib, P_D)])
-        return tlist, res
+        mesolve_opts = solver_options(store_states=True)
+        res = mesolve(
+            H,
+            psi0,
+            tlist,
+            c_ops=[],
+            e_ops=[tensor(Ia, Ib, P_S), tensor(Ia, Ib, P_P), tensor(Ia, Ib, P_D)],
+            options=mesolve_opts,
+        )
+
+        # Build field operator for selected polarization (left/right)
+        taulist = None
+        g1_tau = None
+        if pol in ('left', 'right'):
+            a = destroy(N_a)
+            b = destroy(N_b)
+            field = tensor(a, Ib, qeye(8)) if pol == 'left' else tensor(Ia, b, qeye(8))
+            tau_max = params['tau_max_us'] * 1e-6
+            taulist = np.linspace(0.0, tau_max, int(params['n_tau']))
+            _G1, g1_tau, g2_tau = first_order_coherence(
+                H,
+                psi0,
+                tlist,
+                [],
+                field,
+                taulist,
+                states=res.states,
+            )
+        else:
+            g2_tau = None
+        return tlist, res, taulist, g1_tau, g2_tau
 
     fig, ax = plt.subplots(figsize=(9, 6))
     # Reserve extra bottom margin for added cavity controls
@@ -459,6 +724,7 @@ def interactive_populations():
     ax_gcav   = plt.axes([xL, row_y(3), wC, row_h], facecolor=axcolor)
     ax_ampdrv = plt.axes([xL, row_y(4), wC, row_h], facecolor=axcolor)
     ax_amprep = plt.axes([xR, row_y(4), wC, row_h], facecolor=axcolor)
+    ax_taumax = plt.axes([xL, row_y(5), wC, row_h], facecolor=axcolor)
 
     s_BG   = Slider(ax_BG,   'B (G)',       0.0, 50.0, valinit=params['B_G'])
     s_tmax = Slider(ax_tmax, 't_max (us)',  5.0, 200.0, valinit=params['tmax_us'])
@@ -470,12 +736,13 @@ def interactive_populations():
     s_gcav = Slider(ax_gcav, 'g_cav (MHz)', 0.0, 50.0, valinit=0.0)
     s_ampdrv = Slider(ax_ampdrv, 'driving laser amplitude (MHz)', 0.0, 100.0, valinit=params['amp_driv_MHz'])
     s_amprep = Slider(ax_amprep, 'repump laser amplitude (MHz)',  0.0, 100.0, valinit=params['amp_rep_MHz'])
+    s_taumax = Slider(ax_taumax, 'τ_max (us)', 0.05, 10.0, valinit=params['tau_max_us'])
 
     ax_sys = plt.axes([0.82, 0.08, 0.15, 0.12], facecolor=axcolor)
     rb_sys = RadioButtons(ax_sys, ('left', 'pi', 'right'), active=1)
 
     # Initial compute and line setup (after controls exist)
-    t, res = build_and_solve()
+    t, res, taulist, g1_tau, g2_tau = build_and_solve()
     Pg, Pe, Ps = (np.array(res.expect[i]) for i in range(3))
     ln_e, = ax.plot(t * 1e6, Pe, label='P1/2 population')
     ln_g, = ax.plot(t * 1e6, Pg, label='S1/2 population')
@@ -487,6 +754,31 @@ def interactive_populations():
     ax.grid(True, alpha=0.3)
     ax.legend(loc='upper right')
 
+    # First-order coherence plot (separate figure to keep UI simple)
+    fig_g1, ax_g1 = plt.subplots(figsize=(8, 3))
+    if g1_tau is not None:
+        ln_g1, = ax_g1.plot(taulist * 1e6, g1_tau, label='g^(1)(τ)')
+        ax_g1.set_xlim(taulist[0] * 1e6, taulist[-1] * 1e6)
+    else:
+        ln_g1, = ax_g1.plot([], [], label='g^(1)(τ)')
+    ax_g1.set_xlabel('Delay τ (us)')
+    ax_g1.set_ylabel('g^(1)')
+    _set_y_limits(ax_g1, g1_tau, (0.0, 1.0))
+    ax_g1.grid(True, alpha=0.3)
+    ax_g1.legend(loc='upper right')
+
+    fig_g2, ax_g2 = plt.subplots(figsize=(8, 3))
+    if g2_tau is not None:
+        ln_g2, = ax_g2.plot(taulist * 1e6, g2_tau, label='g^(2)(τ)')
+        ax_g2.set_xlim(taulist[0] * 1e6, taulist[-1] * 1e6)
+    else:
+        ln_g2, = ax_g2.plot([], [], label='g^(2)(τ)')
+    ax_g2.set_xlabel('Delay τ (us)')
+    ax_g2.set_ylabel('g^(2)')
+    _set_y_limits(ax_g2, g2_tau, (0.0, 2.0))
+    ax_g2.grid(True, alpha=0.3)
+    ax_g2.legend(loc='upper right')
+
     def recompute(_=None):
         params['B_G'] = s_BG.val
         params['tmax_us'] = s_tmax.val
@@ -497,18 +789,34 @@ def interactive_populations():
         params['system'] = rb_sys.value_selected
         params['amp_driv_MHz'] = s_ampdrv.val
         params['amp_rep_MHz']  = s_amprep.val
-        t2, res2 = build_and_solve()
+        params['tau_max_us']   = s_taumax.val
+        t2, res2, tau2, g1_2, g2_2 = build_and_solve()
         ln_e.set_data(t2 * 1e6, np.array(res2.expect[1]))
         ln_g.set_data(t2 * 1e6, np.array(res2.expect[0]))
         ln_s.set_data(t2 * 1e6, np.array(res2.expect[2]))
         ax.set_xlim(t2[0] * 1e6, t2[-1] * 1e6)
+        if g1_2 is not None:
+            ln_g1.set_data(tau2 * 1e6, g1_2)
+            ax_g1.set_xlim(tau2[0] * 1e6, tau2[-1] * 1e6)
+            _set_y_limits(ax_g1, g1_2, (0.0, 1.0))
+        else:
+            _set_y_limits(ax_g1, None, (0.0, 1.0))
+        if g2_2 is not None:
+            ln_g2.set_data(tau2 * 1e6, g2_2)
+            ax_g2.set_xlim(tau2[0] * 1e6, tau2[-1] * 1e6)
+            _set_y_limits(ax_g2, g2_2, (0.0, 2.0))
+        else:
+            _set_y_limits(ax_g2, None, (0.0, 2.0))
         fig.canvas.draw_idle()
+        fig_g1.canvas.draw_idle()
+        fig_g2.canvas.draw_idle()
 
-    for s in (s_BG, s_tmax, s_dense, s_ddrv, s_drep, s_dcav, s_gcav, s_ampdrv, s_amprep):
+    for s in (s_BG, s_tmax, s_dense, s_ddrv, s_drep, s_dcav, s_gcav, s_ampdrv, s_amprep, s_taumax):
         s.on_changed(recompute)
     rb_sys.on_clicked(recompute)
 
     plt.show()
+    print_timing_summary()
 
 if __name__ == "__main__":
     interactive_populations()
