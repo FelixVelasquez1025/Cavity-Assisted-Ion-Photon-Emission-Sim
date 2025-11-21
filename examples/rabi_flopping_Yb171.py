@@ -8,17 +8,13 @@ from qutip import Qobj, basis, destroy, qeye, tensor, mesolve, sesolve, expect
 from qutip.solver import Options
 from qutip import correlation_2op_1t
 from qutip import correlation_3op_1t
-
-
 import matplotlib.pyplot as plt
 from matplotlib.widgets import Slider, RadioButtons
 from scipy import constants as consts
-
-
 from atomic_physics.ions.Yb171 import Yb171 
 from sympy import S as _S
-
 from sympy.physics.wigner import wigner_3j as _sympy_wigner_3j
+
 
 
 FUNCTION_TIMINGS: Dict[str, Dict[str, float | int]] = {}
@@ -26,7 +22,9 @@ FUNCTION_TIMINGS: Dict[str, Dict[str, float | int]] = {}
 # Physical constants
 # We work in angular-frequency units (rad/s) and set ħ = 1.
 # Use μB/ħ so g_J μB B has units of rad/s when B is in Tesla.
+
 HBAR = 1.0
+
 MU_B = consts.physical_constants["Bohr magneton"][0] 
 
 
@@ -43,15 +41,11 @@ def _g_factor_for_level(level) -> float:
 # Landé g-factors drawn from atomic_physics metadata
 g_s = _g_factor_for_level(Yb171.S12)
 g_d = _g_factor_for_level(Yb171.D32)
-# Reference linewidths (2π × MHz or kHz) converted to rad/s for defaults.
-LINEWIDTH_SP = 2 * np.pi * 21.57e6   # S1/2 ↔ P1/2
-LINEWIDTH_DP = 2 * np.pi * 1.482e6   # D3/2 ↔ P1/2
-LINEWIDTH_SD = 2 * np.pi * 136e3     # S1/2 ↔ D3/2 (136 mHz -> 136 kHz)
 # Reference linewidths (2π × MHz or mHz) converted to rad/s.
 LINEWIDTH_SP = 2 * np.pi * 21.57e6   # S1/2 ↔ P1/2
 LINEWIDTH_DP = 2 * np.pi * 1.482e6   # D3/2 ↔ P1/2 (852 nm)
 LINEWIDTH_SD = 2 * np.pi * 136e3     # S1/2 ↔ D3/2 (136 mHz → 136 kHz)
-LINEWIDTH_P3 = 2 * np.pi * 1.35e6    # D3/2 ↔ P3/2 (repump dephasing)
+ 
 
 
 def solver_options(store_states: bool = False) -> Options:
@@ -84,6 +78,7 @@ def _set_y_limits(ax, data: np.ndarray | None, default: tuple[float, float], pad
 
 
 def _record_timing(name: str, elapsed: float) -> None:
+  """Accumulate timing statistics for the timed decorator."""
   stats = FUNCTION_TIMINGS.setdefault(name, {'count': 0, 'total': 0.0, 'max': 0.0})
   stats['count'] += 1
   stats['total'] += elapsed
@@ -92,6 +87,7 @@ def _record_timing(name: str, elapsed: float) -> None:
 
 
 def timed(func=None, *, label: str | None = None):
+  """Decorator to time a function and log its elapsed duration."""
   def decorator(fn):
     name = label or fn.__name__
 
@@ -159,6 +155,7 @@ def _clebsch_gordan(j1: float, m1: float, j2: float, m2: float, J: float, M: flo
 # 4: D3/2, m=-3/2; 5: D3/2, m=-1/2; 6: D3/2, m=+1/2; 7: D3/2, m=+3/2
 
 Level = str # 'S', 'P', or 'D'
+CGC_DATA: Dict[str, Dict[int, List[Tuple[Tuple[Level, float], Tuple[Level, float], float]]]] = {}
 
 
 
@@ -177,6 +174,7 @@ def rabi_frequencies(E0_driv: float, E0_rep: float) -> Tuple[float, float]:
 
 #This maps the m_j states to integer indicies so we can build loops with correct indexing later on 
 def state_index(level: Level, m: float) -> int:
+  """Map a (level, m) pair to its index in the 8-state local basis."""
   if level == 'S':
     return 0 if m == -0.5 else 1
   if level == 'P':
@@ -190,11 +188,13 @@ def state_index(level: Level, m: float) -> int:
 # Generalized CGC computation using Wigner-3j and Yb171 J values
 
 def _mj_values(J: float) -> List[float]:
+  """Return the list of m_j values for a given total angular momentum J."""
   twoJ = int(round(2 * J))
   return [(-twoJ + k) / 2.0 for k in range(0, 2 * twoJ + 1)]
 
 
 def _e1_cgc(j_lower: float, m_lower: float, j_upper: float, m_upper: float) -> float:
+  """Electric-dipole Clebsch-Gordan coefficient for a single transition."""
   q = m_upper - m_lower
   if q not in (-1.0, 0.0, 1.0):
     return 0.0
@@ -203,6 +203,7 @@ def _e1_cgc(j_lower: float, m_lower: float, j_upper: float, m_upper: float) -> f
 
 @timed()
 def cgc_lists_general() -> Dict[str, Dict[int, List[Tuple[Tuple[Level, float], Tuple[Level, float], float]]]]:
+  """Build polarization-partitioned CGC tables for SP and DP manifolds."""
   J_S = float(Yb171.S12.J)
   J_P = float(Yb171.P12.J)
   J_D = float(Yb171.D32.J)
@@ -224,7 +225,9 @@ def cgc_lists_general() -> Dict[str, Dict[int, List[Tuple[Tuple[Level, float], T
   DP = build_pair('D', J_D, 'P', J_P)
   return {'SP': SP, 'DP': DP}
 
+# Precompute once
 CGC_DATA = cgc_lists_general()
+
 
 
 # This computes the change in m_j for a given transition, this is used to determine the the transition type, and the polarization of a transition
@@ -239,6 +242,7 @@ _q_to_label = {+1: 'left', 0: 'pi', -1: 'right'}
 
 # This one just returns the index of a state in the local basis
 def _index_from_local(level: Level, m: float) -> int:
+  """Wrapper to reuse state_index in places that expect an index callback."""
   return state_index(level, m)
 
 
@@ -267,6 +271,7 @@ def _build_systems(
     for (lower, upper, cgc) in data.get(q_group, []):
       m_l, m_u = lower[1], upper[1]
       q = delta_mj(m_l, m_u)
+      print(f"[{pair}] Δm={q} for {lower}->{upper} (cgc={cgc})")
       if q not in (-1, 0, +1):
         continue
       Omega = float(Omega_value)
@@ -282,6 +287,8 @@ def _build_systems(
 
 
 # This builds sigma componenets for H_SP and H_DP
+SIGMA_CACHE: Dict[Tuple[str, int], Dict[int, Qobj]] = {}
+
 @timed()
 def transition_sigma_components(pair: str, dim: int = 8) -> Dict[int, Qobj]:
   """Build non-Hermitian atomic operators S_q = Σ_{Δm=q} CGC |upper><lower|.
@@ -289,6 +296,9 @@ def transition_sigma_components(pair: str, dim: int = 8) -> Dict[int, Qobj]:
   This is a local-basis helper (uses state_index) for composing Eq. 2.4.12-2.4.15
   pieces. It does not rely on any external ion object.
   """
+  cache_key = (pair, dim)
+  if cache_key in SIGMA_CACHE:
+    return SIGMA_CACHE[cache_key]
   zero = Qobj(np.zeros((dim, dim), dtype=complex))
   comps: Dict[int, Qobj] = {-1: zero, 0: zero, +1: zero}
   data = CGC_DATA[pair]
@@ -306,6 +316,7 @@ def transition_sigma_components(pair: str, dim: int = 8) -> Dict[int, Qobj]:
   for k in (-1, 0, +1):
     if not isinstance(comps[k], Qobj):
       comps[k] = Qobj(np.zeros((dim, dim), dtype=complex))
+  SIGMA_CACHE[cache_key] = comps
   return comps
 
 @timed()
@@ -319,6 +330,7 @@ def cavity_sigma_DP_components(dim: int = 8) -> Dict[int, Qobj]:
             -1: S.get(-1, Qobj(np.zeros((dim, dim), dtype=complex)))}
 
 def precompute_lowering_tensors(N_a: int, N_b: int, dim_atom: int) -> Dict[str, List[Tuple[Qobj, float]]]:
+    """Precompute and tensor atomic lowering operators into cavity⊗atom space."""
     Ia = qeye(N_a)
     Ib = qeye(N_b)
     tensors: Dict[str, List[Tuple[Qobj, float]]] = {}
@@ -335,39 +347,6 @@ def precompute_lowering_tensors(N_a: int, N_b: int, dim_atom: int) -> Dict[str, 
         tensors[pair] = ops
     return tensors
 
-def build_collapse_operators(
-    params: Dict[str, float],
-    lowering_tensors: Dict[str, List[Tuple[Qobj, float]]],
-    projector_tensors: Dict[str, Qobj],
-    cavity_loss_ops: List[Qobj],
-) -> List[Qobj]:
-    c_ops: List[Qobj] = []
-
-    gamma_sp = params['gamma_SP']
-    gamma_dp = params['gamma_DP']
-    gamma_map = {'SP': gamma_sp, 'DP': gamma_dp}
-
-    for pair, gamma in gamma_map.items():
-        if gamma <= 0:
-            continue
-        for op, weight in lowering_tensors[pair]:
-            if weight > 0:
-                c_ops.append(np.sqrt(2 * gamma) * weight * op)
-
-    dim_atom = 8
-    kappa = 2 * np.pi * params['kappa_MHz'] * 1e6
-    if kappa > 0:
-        for loss_op in cavity_loss_ops:
-            c_ops.append(np.sqrt(2 * kappa) * loss_op)
-
-    delta_S = params['gamma_SD']
-    if delta_S > 0:
-        c_ops.append(np.sqrt(2 * delta_S) * projector_tensors['S'])
-    delta_D = params['gamma_DP']
-    if delta_D > 0:
-        c_ops.append(np.sqrt(2 * delta_D) * projector_tensors['D'])
-
-    return c_ops
 
 # This builds H_a and H_b for left and right polarizations
 @timed()
@@ -526,6 +505,40 @@ def projector_for_indices(indices: List[int], dim: int = 8) -> Qobj:
   return P
 
 
+def build_collapse_operators(
+    params: Dict[str, float],
+    lowering_tensors: Dict[str, List[Tuple[Qobj, float]]],
+    projector_tensors: Dict[str, Qobj],
+    cavity_loss_ops: List[Qobj],
+) -> List[Qobj]:
+    """Assemble all collapse operators (atomic decay, cavity loss, dephasing)."""
+    c_ops: List[Qobj] = []
+
+    gamma_sp = params['gamma_SP']
+    gamma_dp = params['gamma_DP']
+    gamma_map = {'SP': gamma_sp, 'DP': gamma_dp}
+
+    for pair, gamma in gamma_map.items():
+        if gamma <= 0:
+            continue
+        for op, weight in lowering_tensors[pair]:
+            if weight > 0:
+                c_ops.append(np.sqrt(2 * gamma) * weight * op)
+
+    kappa = 2 * np.pi * params['kappa_MHz'] * 1e6
+    if kappa > 0:
+        for loss_op in cavity_loss_ops:
+            c_ops.append(np.sqrt(2 * kappa) * loss_op)
+
+    delta_S = params['gamma_SD']
+    if delta_S > 0:
+        c_ops.append(np.sqrt(2 * delta_S) * projector_tensors['S'])
+    delta_D = params['gamma_DP']
+    if delta_D > 0:
+        c_ops.append(np.sqrt(2 * delta_D) * projector_tensors['D'])
+
+    return c_ops
+
 
 
 # First-order coherence G^(1) and degree g^(1) for photon generation probability
@@ -634,15 +647,15 @@ def interactive_populations():
     tmax_us=50.0,
     density=8.0, # samples per microsecond
     system='pi',
-    amp_driv_MHz=10.0, # driving laser amplitude E0 (MHz)
-    amp_rep_MHz=5.0,  # repump laser amplitude E0 (MHz)
+    amp_driv_MHz=0.0, # driving laser amplitude E0 (MHz)
+    amp_rep_MHz=0.0,  # repump laser amplitude E0 (MHz)
     tau_max_us=0.5,   # window for first-order coherence (keep small by default)
-    n_tau=40,      # number of tau samples
+    n_tau=20,      # number of tau samples
   )
 
 
   # Initial atomic state |S, +1/2>
-  psi0_atom = basis(8, state_index('S', +0.5))
+  psi0_atom = basis(8, state_index('S', + 0.5))
   P_S = projector_for_indices([state_index('S', -0.5), state_index('S', +0.5)], dim=8)
   P_P = projector_for_indices([state_index('P', -0.5), state_index('P', +0.5)], dim=8)
   P_D = projector_for_indices([state_index('D', -1.5), state_index('D', -0.5), state_index('D', +0.5), state_index('D', +1.5)], dim=8)
@@ -657,6 +670,8 @@ def interactive_populations():
     'P': tensor(Ia, Ib, P_P),
     'D': tensor(Ia, Ib, P_D),
   }
+  field_left = tensor(destroy(N_a), Ib, qeye(8))
+  field_right = tensor(Ia, destroy(N_b), qeye(8))
   cavity_loss_ops = [
     tensor(destroy(N_a), Ib, I_atom),
     tensor(Ia, destroy(N_b), I_atom),
@@ -689,7 +704,7 @@ def interactive_populations():
     H = H_full[pol]
     psi0 = tensor(basis(N_a, 0), basis(N_b, 0), psi0_atom)
     c_ops = build_collapse_operators(params, lowering_tensors, projector_tensors, cavity_loss_ops)
-    mesolve_opts = solver_options(store_states=True)
+    mesolve_opts = solver_options(store_states=False)
     res = mesolve(
       H,
       psi0,
@@ -703,11 +718,9 @@ def interactive_populations():
     taulist = None
     g1_tau = None
     if pol in ('left', 'right'):
-      a = destroy(N_a)
-      b = destroy(N_b)
-      field = tensor(a, Ib, qeye(8)) if pol == 'left' else tensor(Ia, b, qeye(8))
       tau_max = params['tau_max_us'] * 1e-6
       taulist = np.linspace(0.0, tau_max, int(params['n_tau']))
+      field = field_left if pol == 'left' else field_right
       _G1, g1_tau, g2_tau = first_order_coherence(
         H,
         psi0,
@@ -752,19 +765,19 @@ def interactive_populations():
 
   s_BG  = Slider(ax_BG,  'B (G)',    0.0, 50.0, valinit=params['B_G'])
   s_tmax = Slider(ax_tmax, 't_max (us)', 5.0, 200.0, valinit=params['tmax_us'])
-  s_ddrv = Slider(ax_ddrv, 'Δ_driv (MHz)', -50.0, 50.0, valinit=params['delta_drive_MHz'])
-  s_drep = Slider(ax_drep, 'Δ_rep (MHz)', -50.0, 50.0, valinit=params['delta_rep_MHz'])
-  s_dcav = Slider(ax_dcav, 'Δ_c (MHz)',  -200.0, 200.0, valinit=params['delta_c_MHz'])
+  s_ddrv = Slider(ax_ddrv, 'Δ_driv (MHz)', -3.0, 3.0, valinit=params['delta_drive_MHz'])
+  s_drep = Slider(ax_drep, 'Δ_rep (MHz)', -3.0, 3.0, valinit=params['delta_rep_MHz'])
+  s_dcav = Slider(ax_dcav, 'Δ_c (MHz)',  -3.0, 3.0, valinit=params['delta_c_MHz'])
 
-  s_dense= Slider(ax_dense,'samples/us', 1.0, 200.0, valinit=params['density'])
+  s_dense= Slider(ax_dense,'samples/us', 1.0, 100.0, valinit=params['density'])
   s_gcav = Slider(ax_gcav, 'g_cav (MHz)', 0.0, 50.0, valinit=0.0)
-  s_ampdrv = Slider(ax_ampdrv, 'Ω_drive (MHz)', 0.0, 100.0, valinit=params['amp_driv_MHz'])
-  s_amprep = Slider(ax_amprep, 'Ω_rep (MHz)', 0.0, 100.0, valinit=params['amp_rep_MHz'])
+  s_ampdrv = Slider(ax_ampdrv, 'Ω_drive (MHz)', -30.0, 30.0, valinit=params['amp_driv_MHz'])
+  s_amprep = Slider(ax_amprep, 'Ω_rep (MHz)', -30.0, 30.0, valinit=params['amp_rep_MHz'])
   s_taumax = Slider(ax_taumax, 'τ_max (us)', 0.05, 10.0, valinit=params['tau_max_us'])
   s_gamma_sp = Slider(ax_gammasp, 'γ_SP', 0.0, 1.0, valinit=params['gamma_SP'])
   s_gamma_dp = Slider(ax_gammadp, 'γ_DP', 0.0, 1.0, valinit=params['gamma_DP'])
   s_gamma_sd = Slider(ax_gammasd, 'γ_SD', 0.0, 1.0, valinit=params['gamma_SD'])
-  s_kappa = Slider(ax_kappa, 'κ (MHz)', 0.0, 10.0, valinit=params['kappa_MHz'])
+  s_kappa = Slider(ax_kappa, 'κ (MHz)', 0.0, 1.0, valinit=params['kappa_MHz'])
 
   ax_sys = plt.axes([0.82, 0.08, 0.15, 0.12], facecolor=axcolor)
   rb_sys = RadioButtons(ax_sys, ('left', 'pi', 'right'), active=1)
