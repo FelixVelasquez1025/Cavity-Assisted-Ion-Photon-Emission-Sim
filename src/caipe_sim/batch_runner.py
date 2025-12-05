@@ -17,7 +17,16 @@ from typing import Dict, Iterable, List
 import numpy as np
 from qutip import basis, destroy, qeye, tensor, mesolve
 
-from .interactive_ui import (
+# Allow running as a script (python src/caipe_sim/batch_runner.py) or as a module
+# (python -m caipe_sim.batch_runner) by ensuring the repo root is on sys.path
+if __package__ in (None, ""):
+    import sys
+
+    repo_root = Path(__file__).resolve().parents[2]
+    if str(repo_root) not in sys.path:
+        sys.path.insert(0, str(repo_root))
+
+from caipe_sim.interactive_ui import (
     build_collapse_operators,
     enable_jax_backend_if_available,
     hf_state_index,
@@ -25,7 +34,7 @@ from .interactive_ui import (
     projector_for_level_hf,
     solver_options,
 )
-from .hamiltonian_utils import (
+from caipe_sim.hamiltonian_utils import (
     HF_BASIS_DIM,
     add_bare_terms_to_systems,
     eq_2_4_5_H_S,

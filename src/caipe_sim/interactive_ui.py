@@ -8,13 +8,15 @@ import math
 import time
 from functools import wraps
 import csv
+import json
 from pathlib import Path
 from datetime import datetime
+from types import SimpleNamespace
 from typing import Dict, List, Tuple
 
 import numpy as np
 import matplotlib.pyplot as plt
-from matplotlib.widgets import RadioButtons, Slider
+from matplotlib.widgets import RadioButtons, Slider, Button
 import qutip
 from qutip import Qobj, basis, destroy, qeye, tensor, mesolve, expect
 from qutip import correlation_2op_1t
@@ -32,7 +34,7 @@ except Exception:
     jnp = None
 
 
-USE_JAX_BACKEND = True
+USE_JAX_BACKEND = True  # default to CPU; can be toggled for GPU/JAX
 
 from .hamiltonian_utils import (
     HF_BASIS_DIM,
@@ -97,6 +99,50 @@ def enable_jax_backend_if_available() -> None:
     """Enable JAX backend if available and requested."""
     if USE_JAX_BACKEND and HAVE_JAX:
         qutip_jax.set_as_default()
+
+
+CACHE_KEYS = [
+    "B_G",
+    "delta_drive_MHz",
+    "delta_rep_MHz",
+    "delta_c_MHz",
+    "g_cav_MHz",
+    "amp_driv_MHz",
+    "amp_rep_MHz",
+    "gamma_SP",
+    "gamma_DP",
+    "gamma_SD",
+    "kappa_MHz",
+    "system",
+]
+
+
+def _param_signature(params: dict) -> str:
+    vals = []
+    for k in CACHE_KEYS:
+        v = params.get(k, None)
+        if isinstance(v, float):
+            v = round(v, 6)
+        vals.append(str(v))
+    return "|".join(vals)
+
+
+def load_lookup(path: str | Path) -> Dict[str, dict]:
+    """Load a JSONL lookup table (same format as precomputed_runs.csv)."""
+    path = Path(path)
+    cache: Dict[str, dict] = {}
+    if not path.exists():
+        return cache
+    with path.open("r") as f:
+        for line in f:
+            try:
+                entry = json.loads(line)
+                sig = entry.get("sig")
+                if sig:
+                    cache[sig] = entry
+            except Exception:
+                continue
+    return cache
 
 
 def solver_options(store_states: bool = False) -> dict:
@@ -215,82 +261,64 @@ def build_collapse_operators(
     return c_ops
 
 
-# First-order coherence -------------------------------------------------------
 @timed()
-def first_order_coherence(
+def photon_correlations(
     H: Qobj,
-    psi0: Qobj,
-    tlist: np.ndarray,
+    rho: Qobj,
     c_ops: list | None,
     a_field: Qobj,
     taulist: np.ndarray,
-    states: List[Qobj] | None = None,
-) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    if c_ops is None:
-        c_ops = []
-    a_dag = a_field.dag()
-
-    def _zeros_like(arr: np.ndarray) -> np.ndarray:
-        return np.zeros_like(arr)
-
-    def empty() -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-        zeros = _zeros_like(taulist)
-        return zeros, zeros, zeros
-
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """
+    Compute first- and second-order field correlations for a stationary state.
+    Returns (G1, g1, G2, g2).
+    """
+    taulist = np.asarray(taulist, dtype=float)
     if taulist.size == 0:
-        return empty()
+        z = np.zeros_like(taulist, dtype=float)
+        return z.astype(complex), z.astype(complex), z.astype(complex), z
 
-    rho_final: Qobj | None = None
-    if states:
-        last = states[-1]
-        rho_final = last if last.isoper else (last * last.dag())
-    if rho_final is None:
-        sol = mesolve(H, psi0, tlist, c_ops=c_ops, options=solver_options(store_states=True))
-        if sol.states:
-            last = sol.states[-1]
-            rho_final = last if last.isoper else (last * last.dag())
-    if rho_final is None:
-        return empty()
+    c_ops = [] if c_ops is None else list(c_ops)
+
+    a_dag = a_field.dag()
+    n_op = a_dag * a_field
 
     # Correlation routines expect CPU-friendly data; convert if JAX is active.
     if USE_JAX_BACKEND and HAVE_JAX:
         H = H.to("csr")
-        rho_final = rho_final.to("csr")
+        rho = rho.to("csr")
 
-    number_op = a_dag * a_field
-    intensity = float(np.real(expect(number_op, rho_final)))
-    if abs(intensity) < 1e-18:
-        return empty()
+    intensity = float(np.real(expect(n_op, rho)))
+    if intensity <= 1e-18:
+        z = np.zeros_like(taulist, dtype=float)
+        return z.astype(complex), z.astype(complex), z.astype(complex), z
 
-    corr = None
-    if correlation_2op_1t is not None:
-        try:
-            corr = np.asarray(correlation_2op_1t(H, rho_final, taulist, c_ops, a_dag, a_field, "me"), dtype=complex)
-        except Exception:
-            corr = None
-    if corr is None and correlation_3op_1t is not None:
-        try:
-            I_full = qeye(H.shape[0])
-            corr = np.asarray(
-                correlation_3op_1t(H, rho_final, taulist, c_ops, a_dag, a_field, I_full, "me"), dtype=complex
-            )
-        except Exception:
-            corr = None
-    if corr is None:
-        return empty()
+    G1 = np.asarray(
+        correlation_2op_1t(H, rho, taulist, c_ops, a_dag, a_field, solver="me"),
+        dtype=complex,
+    )
+    g1 = G1 / intensity
 
-    G1_tau = np.real(corr)
-    g1_tau_raw = corr / intensity
-    tau_c = float(np.trapezoid(np.abs(g1_tau_raw) ** 2, x=taulist))
-    g1_model = _zeros_like(taulist) if tau_c <= 0.0 else np.exp(-(taulist / tau_c) ** 2)
-    return G1_tau, g1_model, _zeros_like(taulist)
+    G2 = np.asarray(
+        correlation_3op_1t(H, rho, taulist, c_ops, a_dag, n_op, a_field, solver="me"),
+        dtype=complex,
+    )
+    denom = intensity ** 2
+    if denom > 1e-24:
+        g2 = np.real(G2 / denom)
+    else:
+        g2 = np.zeros_like(taulist, dtype=float)
+
+    return G1, g1, G2, g2
 
 
 # Interactive UI --------------------------------------------------------------
 @timed()
-def interactive_populations():
+def interactive_populations(lookup_path: str | Path | None = None):
     # Enable GPU/JAX backend if available
     enable_jax_backend_if_available()
+
+    lookup_cache = load_lookup(lookup_path) if lookup_path else {}
 
     params = dict(
         B_G=5.0,
@@ -306,12 +334,13 @@ def interactive_populations():
         tmax_us=50.0,
         density=8.0,
         system="left",
-        is_bosonic=False,  # default to fermionic (hyperfine) basis
+        is_bosonic=True,  # match example default (bosonic mJ basis)
         g_cav_MHz=0.0,
         amp_driv_MHz=0.0,
         amp_rep_MHz=0.0,
         tau_max_us=0.5,
         n_tau=20,
+        use_cache=False,
     )
 
     use_bosonic = bool(params.get("is_bosonic", False))
@@ -354,7 +383,7 @@ def interactive_populations():
     lowering_tensors = precompute_lowering_tensors(N_a, N_b, dim_atom) if use_bosonic else precompute_lowering_tensors_hf(N_a, N_b, dim_atom)
 
     @timed(label="build_and_solve")
-    def build_and_solve():
+    def build_and_solve(compute_correlations: bool = False):
         use_bos = bool(params.get("is_bosonic", False))
         e1_coeffs = precompute_e1_coeffs(use_bos) if use_bos else precompute_e1_coeffs_hf()
         B_T = params["B_G"] * 1e-4
@@ -386,33 +415,56 @@ def interactive_populations():
         H = H_full[pol]
         psi0 = tensor(basis(N_a, 0), basis(N_b, 0), psi0_atom)
         c_ops = build_collapse_operators(params, lowering_tensors, projector_tensors, cavity_loss_ops)
+        # Lookup path
+        sig = _param_signature(params)
+        if lookup_cache and sig in lookup_cache:
+            entry = lookup_cache[sig]
+            tlist_cached = np.array(entry["t"], dtype=float)
+            P_S_arr = np.array(entry["P_S"], dtype=float)
+            P_P_arr = np.array(entry["P_P"], dtype=float)
+            P_D_arr = np.array(entry["P_D"], dtype=float)
+            fake_res = SimpleNamespace(expect=[P_S_arr, P_P_arr, P_D_arr], states=None)
+            taulist_cached = np.array(entry.get("tau", []), dtype=float) if entry.get("tau") else None
+            g1_cached = np.array(entry.get("g1", []), dtype=float) if entry.get("g1") else None
+            g2_cached = np.array(entry.get("g2", []), dtype=float) if entry.get("g2") else None
+            return tlist_cached, fake_res, taulist_cached, g1_cached, g2_cached
+
         res = mesolve(
             H,
             psi0,
             tlist,
             c_ops=c_ops,
             e_ops=[projector_tensors["S"], projector_tensors["P"], projector_tensors["D"]],
-            options=solver_options(store_states=False),
+            options=solver_options(store_states=compute_correlations),
         )
 
         tau_max = params["tau_max_us"] * 1e-6
         taulist = np.linspace(0.0, tau_max, int(params["n_tau"]))
         field = sigma_left if pol == "left" else sigma_right if pol == "right" else sigma_pi
-        _G1, g1_tau, _ = first_order_coherence(
-            H,
-            psi0,
-            tlist,
-            c_ops,
-            field,
-            taulist,
-            states=res.states,
-        )
+        if compute_correlations:
+            rho_final = res.states[-1] if res.states else None
+            if rho_final is not None and not rho_final.isoper:
+                rho_final = rho_final * rho_final.dag()
+            if rho_final is None:
+                g1_tau = None
+                g2_tau = None
+            else:
+                _G1, g1_tau, _G2, g2_tau = photon_correlations(
+                    H,
+                    rho_final,
+                    c_ops,
+                    field,
+                    taulist,
+                )
+        else:
+            g1_tau = None
+            g2_tau = None
         # Append results to CSV for later analysis
         try:
             _record_results_csv(params, tlist, res)
         except Exception:
             pass
-        return tlist, res, taulist, g1_tau, None
+        return tlist, res, taulist, g1_tau, g2_tau
 
     fig, ax = plt.subplots(figsize=(9, 6))
     plt.subplots_adjust(left=0.10, right=0.95, bottom=0.60)
@@ -459,7 +511,8 @@ def interactive_populations():
     ax_sys = plt.axes([0.82, 0.08, 0.15, 0.12], facecolor=axcolor)
     rb_sys = RadioButtons(ax_sys, ("left", "pi", "right"), active=0)
 
-    t, res, taulist, g1_tau, _ = build_and_solve()
+    # Initial solve (populations only; correlations off by default)
+    t, res, taulist, g1_tau, g2_tau = build_and_solve(compute_correlations=False)
     Pg, Pe, Ps = (np.array(res.expect[i]) for i in range(3))
     ln_e, = ax.plot(t * 1e6, Pe, label="P1/2 population")
     ln_g, = ax.plot(t * 1e6, Pg, label="S1/2 population")
@@ -473,17 +526,34 @@ def interactive_populations():
 
     fig_g1, ax_g1 = plt.subplots(figsize=(8, 3))
     if g1_tau is not None:
-        ln_g1, = ax_g1.plot(taulist * 1e6, g1_tau, label="g^(1)(τ)")
+        g1_plot = np.real(g1_tau)
+        ln_g1, = ax_g1.plot(taulist * 1e6, g1_plot, label="g^(1)(τ)")
         ax_g1.set_xlim(taulist[0] * 1e6, taulist[-1] * 1e6)
+        g1_for_limits = g1_plot
     else:
         ln_g1, = ax_g1.plot([], [], label="g^(1)(τ)")
+        g1_for_limits = None
     ax_g1.set_xlabel("Delay τ (us)")
     ax_g1.set_ylabel("g^(1)")
-    _set_y_limits(ax_g1, g1_tau, (0.0, 1.0))
+    _set_y_limits(ax_g1, g1_for_limits, (0.0, 1.0))
     ax_g1.grid(True, alpha=0.3)
     ax_g1.legend(loc="upper right")
 
-    def recompute(_=None):
+    fig_g2, ax_g2 = plt.subplots(figsize=(8, 3))
+    if g2_tau is not None:
+        g2_plot = np.real(g2_tau)
+        ln_g2, = ax_g2.plot(taulist * 1e6, g2_plot, label="g^(2)(τ)")
+        ax_g2.set_xlim(taulist[0] * 1e6, taulist[-1] * 1e6)
+        _set_y_limits(ax_g2, g2_plot, (0.0, max(2.0, float(np.nanmax(g2_plot) * 1.1))))
+    else:
+        ln_g2, = ax_g2.plot([], [], label="g^(2)(τ)")
+        _set_y_limits(ax_g2, None, (0.0, 2.0))
+    ax_g2.set_xlabel("Delay τ (us)")
+    ax_g2.set_ylabel("g^(2)(τ)")
+    ax_g2.grid(True, alpha=0.3)
+    ax_g2.legend(loc="upper right")
+
+    def recompute(_=None, compute_corr: bool = False):
         params["B_G"] = s_BG.val
         params["tmax_us"] = s_tmax.val
         params["density"] = float(s_dense.val)
@@ -498,22 +568,38 @@ def interactive_populations():
         params["gamma_DP"] = s_gamma_dp.val
         params["gamma_SD"] = s_gamma_sd.val
         params["kappa_MHz"] = s_kappa.val
-        t2, res2, tau2, g1_2, _ = build_and_solve()
+        t2, res2, tau2, g1_2, g2_2 = build_and_solve(compute_correlations=compute_corr)
         ln_e.set_data(t2 * 1e6, np.array(res2.expect[1]))
         ln_g.set_data(t2 * 1e6, np.array(res2.expect[0]))
         ln_s.set_data(t2 * 1e6, np.array(res2.expect[2]))
         ax.set_xlim(t2[0] * 1e6, t2[-1] * 1e6)
         if g1_2 is not None:
-            ln_g1.set_data(tau2 * 1e6, g1_2)
+            g1_plot = np.real(g1_2)
+            ln_g1.set_data(tau2 * 1e6, g1_plot)
             ax_g1.set_xlim(tau2[0] * 1e6, tau2[-1] * 1e6)
-            _set_y_limits(ax_g1, g1_2, (0.0, 1.0))
+            _set_y_limits(ax_g1, g1_plot, (0.0, 1.0))
         else:
             ln_g1.set_data([], [])
             _set_y_limits(ax_g1, None, (0.0, 1.0))
+        if g2_2 is not None:
+            g2_plot = np.real(g2_2)
+            ln_g2.set_data(tau2 * 1e6, g2_plot)
+            ax_g2.set_xlim(tau2[0] * 1e6, tau2[-1] * 1e6)
+            _set_y_limits(ax_g2, g2_plot, (0.0, max(2.0, float(np.nanmax(g2_plot) * 1.1))))
+        else:
+            ln_g2.set_data([], [])
+            _set_y_limits(ax_g2, None, (0.0, 2.0))
+
         fig.canvas.draw_idle()
         fig_g1.canvas.draw_idle()
+        fig_g2.canvas.draw_idle()
 
     for s in (s_BG, s_tmax, s_dense, s_ddrv, s_drep, s_dcav, s_gcav, s_ampdrv, s_amprep, s_taumax, s_gamma_sp, s_gamma_dp, s_gamma_sd, s_kappa):
-        s.on_changed(recompute)
-    rb_sys.on_clicked(recompute)
+        s.on_changed(lambda evt, compute_corr=False: recompute(evt, compute_corr=False))
+    rb_sys.on_clicked(lambda evt: recompute(evt, compute_corr=False))
+
+    # Button to trigger expensive photon correlation computation
+    ax_btn = plt.axes([0.70, 0.02, 0.25, 0.05], facecolor=axcolor)
+    btn_corr = Button(ax_btn, "Compute g^(1)/g^(2)")
+    btn_corr.on_clicked(lambda evt: recompute(evt, compute_corr=True))
     plt.show()

@@ -13,7 +13,7 @@ from qutip.solver import Options
 from qutip import correlation_2op_1t
 from qutip import correlation_3op_1t
 import matplotlib.pyplot as plt
-from matplotlib.widgets import Slider, RadioButtons
+from matplotlib.widgets import Slider, RadioButtons, Button
 from scipy import constants as consts
 from atomic_physics.ions.Yb171 import Yb171
 from sympy import S as _S
@@ -1018,15 +1018,17 @@ def _simulate_once(params: Dict[str, float], compute_coherence: bool = False) ->
     tau_max = params['tau_max_us'] * 1e-6
     taulist = np.linspace(0.0, tau_max, int(params['n_tau']))
     field = field_left if pol == 'left' else field_right
-    _G1, g1_tau, g2_tau = first_order_coherence(
-      H,
-      psi0,
-      tlist,
-      c_ops,
-      field,
-      taulist,
-      states=res.states,
-    )
+    rho_final = res.states[-1] if res.states else None
+    if rho_final is not None and not rho_final.isoper:
+      rho_final = rho_final * rho_final.dag()
+    if rho_final is not None:
+      _G1, g1_tau, _G2, g2_tau = photon_correlations(
+        H,
+        rho_final,
+        c_ops,
+        field,
+        taulist,
+      )
 
   return tlist, res, taulist, g1_tau, g2_tau
 
@@ -1079,115 +1081,85 @@ def build_collapse_operators(
 
 # First-order coherence G^(1) and degree g^(1) for photon generation probability
 @timed()
-def first_order_coherence(
-  H: Qobj,
-  psi0: Qobj,
-  tlist: np.ndarray,
-  c_ops: list | None,
-  a_field: Qobj,
-  taulist: np.ndarray,
-  states: List[Qobj] | None = None,
-) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-  """Compute steady-state G¹(τ), model g¹(τ), and g²(τ).
+def photon_correlations(
+    H: Qobj,
+    rho: Qobj,
+    c_ops: list | None,
+    a_field: Qobj,
+    taulist: np.ndarray,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """
+    Compute first- and second-order field correlations for a stationary state.
 
-  - H, psi0, tlist: system Hamiltonian, initial state, times
-  - c_ops: collapse operators (may be empty list)
-  - a_field: field annihilation operator in the full Hilbert space
-  - taulist: delays τ to evaluate
-  Returns three arrays of length len(taulist).
-  """
-  if c_ops is None:
-    c_ops = []
+    Parameters
+    ----------
+    H : Qobj
+        System Hamiltonian in the rotating frame.
+    rho : Qobj
+        Density matrix at the reference time t (e.g. steady state or final state).
+    c_ops : list of Qobj or None
+        Collapse operators for the master equation.
+    a_field : Qobj
+        Annihilation operator of the field mode of interest (e.g. cavity output mode).
+    taulist : np.ndarray
+        1D array of time delays τ at which to evaluate the correlations.
 
-  a_dag = a_field.dag()
+    Returns
+    -------
+    G1_tau : np.ndarray (complex)
+        Unnormalized first-order correlation G^{(1)}(τ) = ⟨a†(0) a(τ)⟩.
+    g1_tau : np.ndarray (complex)
+        Normalized first-order coherence g^{(1)}(τ) = G^{(1)}(τ) / I,
+        where I = ⟨a† a⟩.
+    G2_tau : np.ndarray (complex)
+        Unnormalized second-order correlation
+        G^{(2)}(τ) = ⟨a†(0) a†(τ) a(τ) a(0)⟩.
+    g2_tau : np.ndarray (float)
+        Normalized second-order coherence
+        g^{(2)}(τ) = G^{(2)}(τ) / I² (real part returned).
+    """
+    # Ensure sensible inputs
+    taulist = np.asarray(taulist, dtype=float)
+    if taulist.size == 0:
+        z = np.zeros_like(taulist, dtype=float)
+        return z.astype(complex), z.astype(complex), z.astype(complex), z
 
-  def _zeros_like(arr: np.ndarray) -> np.ndarray:
-    return np.zeros_like(arr)
+    c_ops = [] if c_ops is None else list(c_ops)
 
-  def empty() -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    zeros = _zeros_like(taulist)
-    return zeros, zeros, zeros
+    a_dag = a_field.dag()
+    n_op = a_dag * a_field
 
-  if taulist.size == 0:
-    return empty()
+    # Mean photon number I = <a† a>
+    intensity = float(np.real(expect(n_op, rho)))
+    if intensity <= 1e-18:
+        # Essentially dark: correlations are ill-defined, return zeros
+        z = np.zeros_like(taulist, dtype=float)
+        return z.astype(complex), z.astype(complex), z.astype(complex), z
 
-  # Use final state of trajectory (or compute it) for steady-state approximation
-  rho_final: Qobj | None = None
-  if states:
-    last = states[-1]
-    rho_final = last if last.isoper else (last * last.dag())
-  if rho_final is None:
-    sol = mesolve(H, psi0, tlist, c_ops=c_ops, options=solver_options(store_states=True))
-    if sol.states:
-      last = sol.states[-1]
-      rho_final = last if last.isoper else (last * last.dag())
-  if rho_final is None:
-    return empty()
-
-  number_op = a_dag * a_field
-  intensity = float(np.real(expect(number_op, rho_final)))
-  if abs(intensity) < 1e-18:
-    print(f"[coherence] Intensity ~0 (|n|={intensity:.3e}); returning zeros.")
-    return empty()
-
-  if correlation_2op_1t is not None:
-    try:
-      corr = np.asarray(
-        correlation_2op_1t(H, rho_final, taulist, c_ops, a_dag, a_field, 'me'),
+    # ---------- First-order correlation G^(1)(τ) ----------
+    # For a stationary state: G^(1)(τ) = <a†(t) a(t+τ)>
+    G1 = np.asarray(
+        correlation_2op_1t(H, rho, taulist, c_ops, a_dag, a_field, solver='me'),
         dtype=complex,
-      )
-    except Exception:
-      corr = None
-  else:
-    corr = None
+    )
+    # Normalized first-order coherence (using I; for stationary state G1(0) = I)
+    g1 = G1 / intensity
 
-  if corr is None and correlation_3op_1t is not None:
-    try:
-      I_full = qeye(H.shape[0])
-      corr = np.asarray(
-        correlation_3op_1t(H, rho_final, taulist, c_ops, a_dag, a_field, I_full, 'me'),
+    # ---------- Second-order correlation G^(2)(τ) ----------
+    # correlation_3op_1t returns <A(t) B(t+τ) C(t)>
+    # Choose A = a†, B = n = a†a, C = a
+    # => <a†(t) [a†a](t+τ) a(t)> = <a†(t) a†(t+τ) a(t+τ) a(t)>
+    G2 = np.asarray(
+        correlation_3op_1t(H, rho, taulist, c_ops, a_dag, n_op, a_field, solver='me'),
         dtype=complex,
-      )
-    except Exception:
-      corr = None
+    )
+    denom = intensity**2
+    if denom > 1e-24:
+        g2 = np.real(G2 / denom)
+    else:
+        g2 = np.zeros_like(taulist, dtype=float)
 
-  if corr is None:
-    print("[coherence] correlation_fallback_zero path")
-    return empty()
-
-  G1_tau = np.real(corr)
-  g1_tau_raw = corr / intensity
-  tau_c = float(np.trapezoid(np.abs(g1_tau_raw) ** 2, x=taulist))
-  if tau_c <= 0.0:
-    g1_model = _zeros_like(taulist)
-  else:
-    g1_model = np.exp(-(taulist / tau_c) ** 2)
-  print(f"tau_c = {tau_c:.3e} s")
-
-  g2_tau = _zeros_like(taulist)
-  if correlation_3op_1t is not None:
-    try:
-      g2_linear = correlation_3op_1t(
-        H,
-        rho_final,
-        taulist,
-        c_ops,
-        a_dag,
-        number_op,
-        a_field,
-        solver='me',
-      )
-      g2_linear = np.asarray(g2_linear, dtype=complex)
-      denom_g2 = intensity ** 2
-      if denom_g2 > 1e-18:
-        g2_tau = np.real(g2_linear / denom_g2)
-      else:
-        print(f"[coherence] g2 skipped due to tiny intensity^2={denom_g2:.3e}")
-      print(f"[coherence] correlation_3op_1t path for g2 (intensity={intensity:.3e})")
-    except Exception:
-      pass
-
-  return G1_tau, g1_model, g2_tau
+    return G1, g1, G2, g2
 
 
 
@@ -1220,7 +1192,7 @@ def interactive_populations():
     density=8.0, # samples per microsecond
     system='left',
     is_bosonic=True,
-    use_cache=True,
+    use_cache=False,
     g_cav_MHz=0.0,  # alias for slider mapping
     amp_driv_MHz=0.0, # driving laser amplitude E0 (MHz)
     amp_rep_MHz=0.0,  # repump laser amplitude E0 (MHz)
@@ -1271,7 +1243,7 @@ def interactive_populations():
   lowering_tensors = precompute_lowering_tensors(N_a, N_b, dim_atom) if use_bosonic else precompute_lowering_tensors_hf(N_a, N_b, dim_atom)
 
   @timed(label='build_and_solve')
-  def build_and_solve():
+  def build_and_solve(compute_correlations: bool = False):
     print(f"Using {'bosonic (8-state mJ)' if params.get('is_bosonic', False) else 'fermionic (16-state hyperfine)'} basis")
     use_bos = bool(params.get('is_bosonic', False))
     e1_coeffs = precompute_e1_coeffs(use_bos) if use_bos else E1_DATA_HF
@@ -1313,7 +1285,7 @@ def interactive_populations():
         fake_res = SimpleNamespace(expect=[P_S_arr, P_P_arr, P_D_arr], states=None)
         taulist = np.array(cache_entry.get('tau', []), dtype=float) if cache_entry.get('tau') else None
         g1_tau = np.array(cache_entry.get('g1', []), dtype=float) if cache_entry.get('g1') else None
-        g2_tau = None
+        g2_tau = np.array(cache_entry.get('g2', []), dtype=float) if cache_entry.get('g2') else None
         return tlist, fake_res, taulist, g1_tau, g2_tau
     if rb_sys.value_selected in ('left', 'right'):
       H_lift = H_interaction_with_cavity(H_spdp, g=g, N_a=N_a, N_b=N_b) if use_bos else H_interaction_with_cavity_hf(H_spdp, g=g, N_a=N_a, N_b=N_b)
@@ -1324,7 +1296,7 @@ def interactive_populations():
     H = H_full[pol]
     psi0 = tensor(basis(N_a, 0), basis(N_b, 0), psi0_atom)
     c_ops = build_collapse_operators(params, lowering_tensors, projector_tensors, cavity_loss_ops)
-    mesolve_opts = solver_options(store_states=False)
+    mesolve_opts = solver_options(store_states=compute_correlations)
     res = mesolve(
       H,
       psi0,
@@ -1346,16 +1318,18 @@ def interactive_populations():
       field = sigma_right
     else:
       field = sigma_pi
-    _G1, g1_tau, _g2_tmp = first_order_coherence(
-      H,
-      psi0,
-      tlist,
-      c_ops,
-      field,
-      taulist,
-      states=res.states,
-    )
-    g2_tau = None
+    if compute_correlations:
+      rho_final = res.states[-1] if res.states else None
+      if rho_final is not None and not rho_final.isoper:
+        rho_final = rho_final * rho_final.dag()
+      if rho_final is not None:
+        _G1, g1_tau, _G2, g2_tau = photon_correlations(
+          H,
+          rho_final,
+          c_ops,
+          field,
+          taulist,
+        )
     if params.get('use_cache', False):
       sig = _param_signature(params)
       entry = {
@@ -1366,7 +1340,8 @@ def interactive_populations():
         "P_P": np.array(res.expect[1]).tolist(),
         "P_D": np.array(res.expect[2]).tolist(),
         "tau": taulist.tolist() if taulist is not None else [],
-        "g1": g1_tau.tolist() if g1_tau is not None else [],
+        "g1": np.real(g1_tau).tolist() if g1_tau is not None else [],
+        "g2": np.real(g2_tau).tolist() if g2_tau is not None else [],
       }
       save_cache_entry(entry)
     return tlist, res, taulist, g1_tau, g2_tau
@@ -1420,7 +1395,7 @@ def interactive_populations():
   rb_sys = RadioButtons(ax_sys, ('left', 'pi', 'right'), active=0)
 
   # Initial compute and line setup (after controls exist)
-  t, res, taulist, g1_tau, g2_tau = build_and_solve()
+  t, res, taulist, g1_tau, g2_tau = build_and_solve(compute_correlations=False)
   Pg, Pe, Ps = (np.array(res.expect[i]) for i in range(3))
   ln_e, = ax.plot(t * 1e6, Pe, label='P1/2 population')
   ln_g, = ax.plot(t * 1e6, Pg, label='S1/2 population')
@@ -1433,20 +1408,37 @@ def interactive_populations():
   ax.grid(True, alpha=0.3)
   ax.legend(loc='upper right')
 
-  # First-order coherence plot (separate figure to keep UI simple)
+  # Coherence plots (start empty until computed)
   fig_g1, ax_g1 = plt.subplots(figsize=(8, 3))
   if g1_tau is not None:
-    ln_g1, = ax_g1.plot(taulist * 1e6, g1_tau, label='g^(1)(τ)')
+    g1_plot = np.real(g1_tau)
+    ln_g1, = ax_g1.plot(taulist * 1e6, g1_plot, label='g^(1)(τ)')
     ax_g1.set_xlim(taulist[0] * 1e6, taulist[-1] * 1e6)
+    g1_for_limits = g1_plot
   else:
     ln_g1, = ax_g1.plot([], [], label='g^(1)(τ)')
+    g1_for_limits = None
   ax_g1.set_xlabel('Delay τ (us)')
   ax_g1.set_ylabel('g^(1)')
-  _set_y_limits(ax_g1, g1_tau, (0.0, 1.0))
+  _set_y_limits(ax_g1, g1_for_limits, (0.0, 1.0))
   ax_g1.grid(True, alpha=0.3)
   ax_g1.legend(loc='upper right')
 
-  def recompute(_=None):
+  fig_g2, ax_g2 = plt.subplots(figsize=(8, 3))
+  if g2_tau is not None:
+    g2_plot = np.real(g2_tau)
+    ln_g2, = ax_g2.plot(taulist * 1e6, g2_plot, label='g^(2)(τ)')
+    ax_g2.set_xlim(taulist[0] * 1e6, taulist[-1] * 1e6)
+    _set_y_limits(ax_g2, g2_plot, (0.0, max(2.0, float(np.nanmax(g2_plot) * 1.1))))
+  else:
+    ln_g2, = ax_g2.plot([], [], label='g^(2)(τ)')
+    _set_y_limits(ax_g2, None, (0.0, 2.0))
+  ax_g2.set_xlabel('Delay τ (us)')
+  ax_g2.set_ylabel('g^(2)')
+  ax_g2.grid(True, alpha=0.3)
+  ax_g2.legend(loc='upper right')
+
+  def recompute(_=None, compute_corr: bool = False):
     params['B_G'] = s_BG.val
     params['tmax_us'] = s_tmax.val
     params['density'] = float(s_dense.val)
@@ -1461,24 +1453,39 @@ def interactive_populations():
     params['gamma_DP'] = s_gamma_dp.val
     params['gamma_SD'] = s_gamma_sd.val
     params['kappa_MHz'] = s_kappa.val
-    t2, res2, tau2, g1_2, g2_2 = build_and_solve()
+    t2, res2, tau2, g1_2, g2_2 = build_and_solve(compute_correlations=compute_corr)
     ln_e.set_data(t2 * 1e6, np.array(res2.expect[1]))
     ln_g.set_data(t2 * 1e6, np.array(res2.expect[0]))
     ln_s.set_data(t2 * 1e6, np.array(res2.expect[2]))
     ax.set_xlim(t2[0] * 1e6, t2[-1] * 1e6)
     if g1_2 is not None:
-      ln_g1.set_data(tau2 * 1e6, g1_2)
+      g1_plot = np.real(g1_2)
+      ln_g1.set_data(tau2 * 1e6, g1_plot)
       ax_g1.set_xlim(tau2[0] * 1e6, tau2[-1] * 1e6)
-      _set_y_limits(ax_g1, g1_2, (0.0, 1.0))
+      _set_y_limits(ax_g1, g1_plot, (0.0, 1.0))
     else:
       ln_g1.set_data([], [])
       _set_y_limits(ax_g1, None, (0.0, 1.0))
+    if g2_2 is not None:
+      g2_plot = np.real(g2_2)
+      ln_g2.set_data(tau2 * 1e6, g2_plot)
+      ax_g2.set_xlim(tau2[0] * 1e6, tau2[-1] * 1e6)
+      _set_y_limits(ax_g2, g2_plot, (0.0, max(2.0, float(np.nanmax(g2_plot) * 1.1))))
+    else:
+      ln_g2.set_data([], [])
+      _set_y_limits(ax_g2, None, (0.0, 2.0))
     fig.canvas.draw_idle()
     fig_g1.canvas.draw_idle()
+    fig_g2.canvas.draw_idle()
 
   for s in (s_BG, s_tmax, s_dense, s_ddrv, s_drep, s_dcav, s_gcav, s_ampdrv, s_amprep, s_taumax, s_gamma_sp, s_gamma_dp, s_gamma_sd, s_kappa):
-    s.on_changed(recompute)
-  rb_sys.on_clicked(recompute)
+    s.on_changed(lambda evt, compute_corr=False: recompute(evt, compute_corr=False))
+  rb_sys.on_clicked(lambda evt: recompute(evt, compute_corr=False))
+
+  # Button to trigger expensive photon correlation computation
+  ax_btn = plt.axes([0.70, 0.02, 0.25, 0.05], facecolor=axcolor)
+  btn_corr = Button(ax_btn, "Compute g^(1)/g^(2)")
+  btn_corr.on_clicked(lambda evt: recompute(evt, compute_corr=True))
 
   plt.show()
   print_timing_summary()
