@@ -29,9 +29,9 @@ FUNCTION_TIMINGS: Dict[str, Dict[str, float | int]] = {}
 # We work in angular-frequency units (rad/s) and set ħ = 1.
 # Use μB/ħ so g_J μB B has units of rad/s when B is in Tesla.
 
-HBAR = consts.hbar  
+HBAR = consts.hbar
 Bosonic = False
-MU_B = consts.physical_constants["Bohr magneton"][0] 
+MU_B = consts.physical_constants["Bohr magneton"][0] / HBAR
 I_NUCLEAR = 0.5  # Yb-171 nuclear spin
 
 # Hyperfine magnetic-dipole constants (A) in GHz.
@@ -434,7 +434,7 @@ def rabi_frequencies(E0_driv: float, E0_rep: float) -> Tuple[float, float]:
   - E0_driv: driving laser field amplitude (rad/s scale)
   - E0_rep: repump laser field amplitude (rad/s scale)
   """
-  return float(E0_driv)/(2*HBAR), float(E0_rep)/(2*HBAR)
+  return float(E0_driv) / 2.0, float(E0_rep) / 2.0
 
 
 def omega_drive(t: float, args: Dict[str, float]) -> float:
@@ -587,6 +587,15 @@ def precompute_e1_coeffs_hyperfine() -> Dict[str, Dict[int, List[Tuple[Tuple[str
             if coeff == 0.0:
               continue
             coeffs[pair][q].append(((lower_level, F_lower, mF_lower), (upper_level, F_upper, mF_upper), coeff))
+  if not globals().get("_HF_E1_DEBUG_PRINTED", False):
+    counts = {pair: {q: len(entries) for q, entries in coeffs[pair].items()} for pair in coeffs}
+    print(f"Hyperfine E1 coefficients (counts per q): {counts}")
+    for pair in ("SP", "DP"):
+      for q in (+1, 0, -1):
+        samples = coeffs[pair][q][:3]
+        if samples:
+          print(f"{pair} q={q} samples: {samples}")
+    globals()["_HF_E1_DEBUG_PRINTED"] = True
   return coeffs
 
 
@@ -651,7 +660,7 @@ def _build_systems(
       ket_u = basis(dim, ui)
       sigma = ket_u * ket_l.dag()
       label = _q_to_label[q]
-      systems[label] = systems[label] + 0.5 * HBAR * Omega * coeff * (sigma + sigma.dag())
+      systems[label] = systems[label] + 0.5 * Omega * coeff * (sigma + sigma.dag())
   return systems
 
 
@@ -678,7 +687,7 @@ def _build_systems_hf(
       ket_u = basis(dim, ui)
       sigma = ket_u * ket_l.dag()
       label = _q_to_label[q]
-      systems[label] = systems[label] + 0.5 * HBAR * Omega * coeff * (sigma + sigma.dag())
+      systems[label] = systems[label] + 0.5 * Omega * coeff * (sigma + sigma.dag())
   return systems
 
 
@@ -807,8 +816,8 @@ def H_cavity_DP_modes(g: float, N_a: int, N_b: int, dim_atom: int = 8) -> Dict[s
   S_p = comps[+1]
   S_m = comps[-1]
 
-  H_a = HBAR* g * (tensor(a, I_b, S_p) + tensor(a.dag(), I_b, S_p.dag()))
-  H_b = HBAR * g * (tensor(I_a, b, S_m) + tensor(I_a, b.dag(), S_m.dag()))
+  H_a = g * (tensor(a, I_b, S_p) + tensor(a.dag(), I_b, S_p.dag()))
+  H_b = g * (tensor(I_a, b, S_m) + tensor(I_a, b.dag(), S_m.dag()))
   return {'left': H_a, 'right': H_b}
 
 
@@ -826,8 +835,8 @@ def H_cavity_DP_modes_hf(g: float, N_a: int, N_b: int, dim_atom: int = HF_BASIS_
   S_p = comps[+1]
   S_m = comps[-1]
 
-  H_a = HBAR * g * (tensor(a, I_b, S_p) + tensor(a.dag(), I_b, S_p.dag()))
-  H_b = HBAR * g * (tensor(I_a, b, S_m) + tensor(I_a, b.dag(), S_m.dag()))
+  H_a = g * (tensor(a, I_b, S_p) + tensor(a.dag(), I_b, S_p.dag()))
+  H_b = g * (tensor(I_a, b, S_m) + tensor(I_a, b.dag(), S_m.dag()))
   return {'left': H_a, 'right': H_b}
 
 
@@ -917,7 +926,7 @@ def H0_cavity(delta_c: float, delta_rep: float, N_a: int, N_b: int, dim_atom: in
   I_atom = qeye(dim_atom)
   a = destroy(N_a)
   b = destroy(N_b)
-  Hc = coeff * HBAR * (tensor(a.dag() * a, qeye(N_b), I_atom) + tensor(qeye(N_a), b.dag() * b, I_atom))
+  Hc = coeff * (tensor(a.dag() * a, qeye(N_b), I_atom) + tensor(qeye(N_a), b.dag() * b, I_atom))
   return Hc
 
 
@@ -1085,11 +1094,13 @@ def _simulate_once(params: Dict[str, float], compute_coherence: bool = False) ->
   E0_rep = 2 * np.pi * params['amp_rep_MHz'] * 1e6
 
   if use_bos:
-    H_spdp = H_laser_systems_from_E0(E0_driv, E0_rep, dim=dim_atom, e1_coeffs=e1_coeffs)
+    Hsp = _build_systems('SP', 1.0, _index_from_local, dim_atom, e1_coeffs=e1_coeffs)
+    Hdp = _build_systems('DP', 1.0, _index_from_local, dim_atom, e1_coeffs=e1_coeffs)
     H_S = eq_2_4_5_H_S(ddrv, B_T, params['g_S'], dim=dim_atom)
     H_D = eq_2_4_6_H_D(drep, B_T, params['g_D'], dim=dim_atom)
   else:
-    H_spdp = H_laser_systems_from_E0_hf(E0_driv, E0_rep, dim=dim_atom, e1_coeffs_hf=e1_coeffs)
+    Hsp = _build_systems_hf('SP', 1.0, dim_atom, e1_coeffs_hf=e1_coeffs)
+    Hdp = _build_systems_hf('DP', 1.0, dim_atom, e1_coeffs_hf=e1_coeffs)
     H_S = eq_2_4_5_H_S_hf(ddrv, B_T, params['g_S'], dim=dim_atom)
     H_D = eq_2_4_6_H_D_hf(drep, B_T, params['g_D'], dim=dim_atom)
 
@@ -1099,23 +1110,38 @@ def _simulate_once(params: Dict[str, float], compute_coherence: bool = False) ->
   g = 2 * np.pi * params.get('g_cav_MHz', 0.0) * 1e6
   dc = 2 * np.pi * params['delta_c_MHz'] * 1e6
 
+  H_zero = Qobj(np.zeros((dim_atom, dim_atom), dtype=complex))
+  H_zero_dict = {name: H_zero for name in ('left', 'pi', 'right')}
   if params['system'] in ('left', 'right'):
-    H_lift = H_interaction_with_cavity(H_spdp, g=g, N_a=N_a, N_b=N_b) if use_bos else H_interaction_with_cavity_hf(H_spdp, g=g, N_a=N_a, N_b=N_b)
+    H_lift = H_interaction_with_cavity(H_zero_dict, g=g, N_a=N_a, N_b=N_b) if use_bos else H_interaction_with_cavity_hf(H_zero_dict, g=g, N_a=N_a, N_b=N_b)
   else:
-    H_lift = {name: tensor(Ia, Ib, H_atom) for name, H_atom in H_spdp.items()}
+    H_lift = {name: tensor(Ia, Ib, H_atom) for name, H_atom in H_zero_dict.items()}
   H_full = add_bare_terms_to_systems(H_lift, H_S, H_D, dc, drep, N_a, N_b)
+  H_sp_lift = {name: tensor(Ia, Ib, H_atom) for name, H_atom in Hsp.items()}
+  H_dp_lift = {name: tensor(Ia, Ib, H_atom) for name, H_atom in Hdp.items()}
   pol = params['system']
   H = H_full[pol]
   psi0 = tensor(basis(N_a, 0), basis(N_b, 0), psi0_atom)
   c_ops = build_collapse_operators(params, lowering_tensors, projector_tensors, cavity_loss_ops)
   mesolve_opts = solver_options(store_states=compute_coherence)
+  Omega_driv, Omega_rep = rabi_frequencies(E0_driv, E0_rep)
+  args = {
+    "drive_amp": float(Omega_driv),
+    "drive_t0": float(params.get("drive_t0_us", 0.0)) * 1e-6,
+    "drive_sigma": float(params.get("drive_sigma_us", 0.0)) * 1e-6,
+    "rep_amp": float(Omega_rep),
+    "rep_t0": float(params.get("rep_t0_us", 0.0)) * 1e-6,
+    "rep_sigma": float(params.get("rep_sigma_us", 0.0)) * 1e-6,
+  }
+  H_td = [H, [H_sp_lift[pol], omega_drive], [H_dp_lift[pol], omega_rep]]
   res = mesolve(
-    H,
+    H_td,
     psi0,
     tlist,
     c_ops=c_ops,
     e_ops=[projector_tensors['S'], projector_tensors['P'], projector_tensors['D'], n_left, n_right],
     options=mesolve_opts,
+    args=args,
   )
 
   taulist = None
@@ -1392,14 +1418,26 @@ def interactive_populations():
     E0_driv = 2 * np.pi * params['amp_driv_MHz'] * 1e6
     E0_rep = 2 * np.pi * params['amp_rep_MHz'] * 1e6
     if use_bos:
-      H_spdp = H_laser_systems_from_E0(E0_driv, E0_rep, dim=dim_atom, e1_coeffs=e1_coeffs)
+      Hsp = _build_systems('SP', 1.0, _index_from_local, dim_atom, e1_coeffs=e1_coeffs)
+      Hdp = _build_systems('DP', 1.0, _index_from_local, dim_atom, e1_coeffs=e1_coeffs)
       H_S = eq_2_4_5_H_S(ddrv, B_T, params['g_S'], dim=dim_atom)
       H_D = eq_2_4_6_H_D(drep, B_T, params['g_D'], dim=dim_atom)
     else:
       # --- Fermionic path: use hyperfine E1 coefficients and F,mF basis ---
-      H_spdp = H_laser_systems_from_E0_hf(E0_driv, E0_rep, dim=dim_atom, e1_coeffs_hf=E1_DATA_HF)
+      Hsp = _build_systems_hf('SP', 1.0, dim_atom, e1_coeffs_hf=e1_coeffs)
+      Hdp = _build_systems_hf('DP', 1.0, dim_atom, e1_coeffs_hf=e1_coeffs)
       H_S = eq_2_4_5_H_S_hf(ddrv, B_T, params['g_S'], dim=dim_atom)
       H_D = eq_2_4_6_H_D_hf(drep, B_T, params['g_D'], dim=dim_atom)
+
+    if not globals().get("_HF_DRIVE_DEBUG_PRINTED", False):
+      try:
+        max_sp = {name: float(np.max(np.abs(Hsp[name].full()))) for name in Hsp}
+        max_dp = {name: float(np.max(np.abs(Hdp[name].full()))) for name in Hdp}
+        print(f"[drive-debug] max|Hsp| per pol: {max_sp}")
+        print(f"[drive-debug] max|Hdp| per pol: {max_dp}")
+      except Exception as exc:
+        print(f"[drive-debug] failed to inspect Hsp/Hdp: {exc}")
+      globals()["_HF_DRIVE_DEBUG_PRINTED"] = True
 
     steps = max(50, int(round(params['tmax_us'] * params['density'])))
     tlist = np.linspace(0, params['tmax_us'] * 1e-6, steps)
@@ -1432,31 +1470,52 @@ def interactive_populations():
         g1_tau = np.array(cache_entry.get('g1', []), dtype=float) if cache_entry.get('g1') else None
         g2_tau = np.array(cache_entry.get('g2', []), dtype=float) if cache_entry.get('g2') else None
         return tlist, fake_res, taulist, g1_tau, g2_tau
+    H_zero = Qobj(np.zeros((dim_atom, dim_atom), dtype=complex))
+    H_zero_dict = {name: H_zero for name in ('left', 'pi', 'right')}
     if rb_sys.value_selected in ('right', 'left'):
-      H_lift = H_interaction_with_cavity(H_spdp, g=g, N_a=N_a, N_b=N_b) if use_bos else H_interaction_with_cavity_hf(H_spdp, g=g, N_a=N_a, N_b=N_b)
+      H_lift = H_interaction_with_cavity(H_zero_dict, g=g, N_a=N_a, N_b=N_b) if use_bos else H_interaction_with_cavity_hf(H_zero_dict, g=g, N_a=N_a, N_b=N_b)
     else:
-      H_lift = {name: tensor(Ia, Ib, H_atom) for name, H_atom in H_spdp.items()}
+      H_lift = {name: tensor(Ia, Ib, H_atom) for name, H_atom in H_zero_dict.items()}
     H_full = add_bare_terms_to_systems(H_lift, H_S, H_D, dc, drep, N_a, N_b)
+    H_sp_lift = {name: tensor(Ia, Ib, H_atom) for name, H_atom in Hsp.items()}
+    H_dp_lift = {name: tensor(Ia, Ib, H_atom) for name, H_atom in Hdp.items()}
     pol = rb_sys.value_selected
     H = H_full[pol]
     psi0 = tensor(basis(N_a, 0), basis(N_b, 0), psi0_atom)
     c_ops = build_collapse_operators(params, lowering_tensors, projector_tensors, cavity_loss_ops)
     mesolve_opts = solver_options(store_states=compute_correlations)
-    # Debug: write the full Hamiltonian matrix to disk with labeled rows/cols.
-    h_path = Path(__file__).with_name("hamiltonian_matrix.txt")
-    np.savetxt(h_path, H.full(), fmt="%.6e")
-    labeled_path = Path(__file__).with_name("hamiltonian_matrix_labeled.csv")
-    labels = _full_basis_labels(N_a, N_b, use_bos)
-    _write_labeled_matrix(labeled_path, labels, H.full())
-    print(f"Hamiltonian (H) written to {h_path}")
-    print(f"Hamiltonian (H) with labels written to {labeled_path}")
+    Omega_driv, Omega_rep = rabi_frequencies(E0_driv, E0_rep)
+    args = {
+      "drive_amp": float(Omega_driv),
+      "drive_t0": float(params.get("drive_t0_us", 0.0)) * 1e-6,
+      "drive_sigma": float(params.get("drive_sigma_us", 0.0)) * 1e-6,
+      "rep_amp": float(Omega_rep),
+      "rep_t0": float(params.get("rep_t0_us", 0.0)) * 1e-6,
+      "rep_sigma": float(params.get("rep_sigma_us", 0.0)) * 1e-6,
+    }
+    H_td = [H, [H_sp_lift[pol], omega_drive], [H_dp_lift[pol], omega_rep]]
+    # Debug: show envelope + operator norms for the chosen polarization.
+    env_peak = omega_drive(args["drive_t0"], args)
+    env_rep_peak = omega_rep(args["rep_t0"], args)
+    hsp_norm = float((H_sp_lift[pol].norm()))
+    hdp_norm = float((H_dp_lift[pol].norm()))
+    print(
+      "[drive-debug] pol=", pol,
+      "Hsp_norm=", f"{hsp_norm:.3e}",
+      "Hdp_norm=", f"{hdp_norm:.3e}",
+      "drive_amp=", f"{args['drive_amp']:.3e}",
+      "rep_amp=", f"{args['rep_amp']:.3e}",
+      "drive_peak=", f"{env_peak:.3e}",
+      "rep_peak=", f"{env_rep_peak:.3e}",
+    )
     res = mesolve(
-      H,
+      H_td,
       psi0,
       tlist,
       c_ops=c_ops,
       e_ops=[display_tensors['ground'], display_tensors['excited'], display_tensors['meta'], n_left, n_right],
       options=mesolve_opts,
+      args=args,
     )
 
     # Build field operator for coherence (use atomic SP fluorescence channel)
@@ -1529,6 +1588,10 @@ def interactive_populations():
   ax_gammadp = plt.axes([xL, row_y(6), wC, row_h], facecolor=axcolor)
   ax_gammasd = plt.axes([xR, row_y(6), wC, row_h], facecolor=axcolor)
   ax_kappa = plt.axes([xL, row_y(7), wC, row_h], facecolor=axcolor)
+  ax_drive_t0 = plt.axes([xR, row_y(7), wC, row_h], facecolor=axcolor)
+  ax_drive_sigma = plt.axes([xL, row_y(8), wC, row_h], facecolor=axcolor)
+  ax_rep_t0 = plt.axes([xR, row_y(8), wC, row_h], facecolor=axcolor)
+  ax_rep_sigma = plt.axes([xL, row_y(9), wC, row_h], facecolor=axcolor)
 
   s_BG  = Slider(ax_BG,  'B (G)',    0.0, 50.0, valinit=params['B_G'])
   s_tmax = Slider(ax_tmax, 't_max (us)', 5.0, 200.0, valinit=params['tmax_us'])
@@ -1545,6 +1608,10 @@ def interactive_populations():
   s_gamma_dp = Slider(ax_gammadp, 'γ_DP', 0.0, 1.0, valinit=params['gamma_DP'])
   s_gamma_sd = Slider(ax_gammasd, 'γ_SD', 0.0, 1.0, valinit=params['gamma_SD'])
   s_kappa = Slider(ax_kappa, 'κ (MHz)', 0.0, 1.0, valinit=params['kappa_MHz'])
+  s_drive_t0 = Slider(ax_drive_t0, 'drive t0 (us)', 0.0, params['tmax_us'], valinit=params['drive_t0_us'])
+  s_drive_sigma = Slider(ax_drive_sigma, 'drive σ (us)', 0.05, params['tmax_us'], valinit=params['drive_sigma_us'])
+  s_rep_t0 = Slider(ax_rep_t0, 'rep t0 (us)', 0.0, params['tmax_us'], valinit=params['rep_t0_us'])
+  s_rep_sigma = Slider(ax_rep_sigma, 'rep σ (us)', 0.05, params['tmax_us'], valinit=params['rep_sigma_us'])
 
   ax_sys = plt.axes([0.82, 0.08, 0.15, 0.12], facecolor=axcolor)
   rb_sys = RadioButtons(ax_sys, ('left', 'pi', 'right'), active=0)
@@ -1619,6 +1686,10 @@ def interactive_populations():
     params['gamma_DP'] = s_gamma_dp.val
     params['gamma_SD'] = s_gamma_sd.val
     params['kappa_MHz'] = s_kappa.val
+    params['drive_t0_us'] = s_drive_t0.val
+    params['drive_sigma_us'] = s_drive_sigma.val
+    params['rep_t0_us'] = s_rep_t0.val
+    params['rep_sigma_us'] = s_rep_sigma.val
     t2, res2, tau2, g1_2, g2_2 = build_and_solve(compute_correlations=compute_corr)
     ln_e.set_data(t2 * 1e6, np.array(res2.expect[1]))
     ln_g.set_data(t2 * 1e6, np.array(res2.expect[0]))
@@ -1651,7 +1722,7 @@ def interactive_populations():
     fig_cav.canvas.draw_idle()
     fig_g2.canvas.draw_idle()
 
-  for s in (s_BG, s_tmax, s_dense, s_ddrv, s_drep, s_dcav, s_gcav, s_ampdrv, s_amprep, s_taumax, s_gamma_sp, s_gamma_dp, s_gamma_sd, s_kappa):
+  for s in (s_BG, s_tmax, s_dense, s_ddrv, s_drep, s_dcav, s_gcav, s_ampdrv, s_amprep, s_taumax, s_gamma_sp, s_gamma_dp, s_gamma_sd, s_kappa, s_drive_t0, s_drive_sigma, s_rep_t0, s_rep_sigma):
     s.on_changed(lambda evt, compute_corr=False: recompute(evt, compute_corr=False))
   rb_sys.on_clicked(lambda evt: recompute(evt, compute_corr=False))
 
