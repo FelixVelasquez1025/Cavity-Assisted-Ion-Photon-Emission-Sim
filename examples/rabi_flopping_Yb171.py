@@ -1,20 +1,19 @@
 from __future__ import annotations
 import math
 from typing import Dict, List, Tuple, Callable
-import csv
 import time
 from functools import wraps
 import json
 from pathlib import Path
 from types import SimpleNamespace
-
+import matplotlib.pyplot as plt
+from matplotlib.widgets import Slider, RadioButtons, Button
 import numpy as np
+
 from qutip import Qobj, basis, destroy, qeye, tensor, mesolve, sesolve, expect
 from qutip.solver import Options
 from qutip import correlation_2op_1t
 from qutip import correlation_3op_1t
-import matplotlib.pyplot as plt
-from matplotlib.widgets import Slider, RadioButtons, Button
 from scipy import constants as consts
 from atomic_physics.ions.Yb171 import Yb171
 from sympy import S as _S
@@ -22,15 +21,61 @@ from sympy.physics.wigner import wigner_3j as _sympy_wigner_3j
 from sympy.physics.wigner import wigner_6j as _sympy_wigner_6j
 
 
+#Timing functions 
 
 FUNCTION_TIMINGS: Dict[str, Dict[str, float | int]] = {}
+
+def _record_timing(name: str, elapsed: float) -> None:
+  """Accumulate timing statistics for the timed decorator."""
+  stats = FUNCTION_TIMINGS.setdefault(name, {'count': 0, 'total': 0.0, 'max': 0.0})
+  stats['count'] += 1
+  stats['total'] += elapsed
+  if elapsed > stats['max']:
+    stats['max'] = elapsed
+
+
+def timed(func=None, *, label: str | None = None):
+  """Decorator to time a function and log its elapsed duration."""
+  def decorator(fn):
+    name = label or fn.__name__
+
+    @wraps(fn)
+    def wrapper(*args, **kwargs):
+      start = time.perf_counter()
+      try:
+        return fn(*args, **kwargs)
+      finally:
+        elapsed = time.perf_counter() - start
+        _record_timing(name, elapsed)
+
+    return wrapper
+
+  if func is None:
+    return decorator
+  return decorator(func)
+
+
+def print_timing_summary() -> None:
+  """Print aggregated timing stats collected by the timed decorator."""
+  if not FUNCTION_TIMINGS:
+    print("Timing summary: no calls recorded.")
+    return
+  print("Timing summary (seconds):")
+  for name in sorted(FUNCTION_TIMINGS):
+    stats = FUNCTION_TIMINGS[name]
+    avg = stats['total'] / stats['count']
+    print(
+      f" {name}: count={stats['count']}, total={stats['total']:.6f}, "
+      f"avg={avg:.6f}, max={stats['max']:.6f}"
+    )
+
+
 
 # Physical constants
 # We work in angular-frequency units (rad/s) and set ħ = 1.
 # Use μB/ħ so g_J μB B has units of rad/s when B is in Tesla.
-
-HBAR = consts.hbar
 Bosonic = False
+HBAR = consts.hbar
 MU_B = consts.physical_constants["Bohr magneton"][0] / HBAR
 I_NUCLEAR = 0.5  # Yb-171 nuclear spin
 
@@ -41,14 +86,28 @@ HFS_A_GHZ = {
   'D': 0.86372,
 }
 
-# Quadratic Zeeman (Hz · G^-2) for S1/2
-QUAD_ZEEMAN_S_HZ_PER_G2 = 310.6
+# values for electron spin g-factor (G_S), orbital g-factor (G_L), and nuclear spin factor (G_I) all from (https://arxiv.org/pdf/2509.04416)
+G_S = 2.00231930436092
+G_L = 0.99999679
+G_I = -0.0005362
+
+# Reduced E1 matrix elements (C·m) for the Yb⁺ manifolds used here.
+_EA0 = consts.e * consts.physical_constants["Bohr radius"][0]
+
+# Diagram-derived lifetimes, branching ratios, and angular frequencies
+TAU_P12 = 8.07e-9       # 6p 2P1/2
+TAU_D32 = 52.7e-3       # 5d 2D3/2
+BR_P12_TO_S12 = 0.995
+BR_P12_TO_D32 = 0.005
+OMEGA_369 = 2 * np.pi * consts.c / 369.5262e-9   # P1/2 <-> S1/2
+OMEGA_2400 = 2 * np.pi * consts.c / 2.400e-6     # P1/2 <-> D3/2
+OMEGA_435 = 2 * np.pi * consts.c / 435.5e-9      # D3/2 <-> S1/2
+
 
 # Canonical 16-state hyperfine basis ordering (increasing manifold, then F, then mF):
 # S1/2: F=0 (mF=0), F=1 (mF=-1,0,+1)
 # P1/2: F=0 (mF=0), F=1 (mF=-1,0,+1)
 # D3/2: F=1 (mF=-1,0,+1), F=2 (mF=-2,-1,0,+1,+2)
-
 
 
 HF_BASIS_ORDER: List[Tuple[str, float, float]] = [
@@ -65,6 +124,7 @@ HF_INDEX: Dict[Tuple[str, float, float], int] = {state: i for i, state in enumer
 # Local 8-state basis ordering (only used for the constant-Ω fallback):
 # 0: S1/2, m=-1/2; 1: S1/2, m=+1/2; 2: P1/2, m=-1/2; 3: P1/2, m=+1/2;
 # 4: D3/2, m=-3/2; 5: D3/2, m=-1/2; 6: D3/2, m=+1/2; 7: D3/2, m=+3/2
+
 _BOSONIC_BASIS_ORDER: List[Tuple[str, float]] = [
   ('S', -0.5), ('S', +0.5),
   ('P', -0.5), ('P', +0.5),
@@ -73,39 +133,12 @@ _BOSONIC_BASIS_ORDER: List[Tuple[str, float]] = [
 
 
 def _fmt_half_int(value: float) -> str:
+  """Format a half-integer as an integer or a ±n/2 string."""
   if abs(value - int(round(value))) < 1e-9:
     return str(int(round(value)))
   two = int(round(value * 2))
   sign = "-" if two < 0 else ""
   return f"{sign}{abs(two)}/2"
-
-
-def _atom_basis_labels(use_bosonic: bool) -> List[str]:
-  if use_bosonic:
-    return [f"{lvl},m={_fmt_half_int(m)}" for (lvl, m) in _BOSONIC_BASIS_ORDER]
-  return [f"{lvl},F={_fmt_half_int(F)},mF={_fmt_half_int(mF)}" for (lvl, F, mF) in HF_BASIS_ORDER]
-
-
-def _full_basis_labels(N_a: int, N_b: int, use_bosonic: bool) -> List[str]:
-  atom_labels = _atom_basis_labels(use_bosonic)
-  labels: List[str] = []
-  for n_a in range(N_a):
-    for n_b in range(N_b):
-      for atom_label in atom_labels:
-        labels.append(f"|n_a={n_a}, n_b={n_b}, {atom_label}>")
-  return labels
-
-
-def _format_complex_entry(value: complex) -> str:
-  return f"{value.real:.6e}{value.imag:+.6e}j"
-
-
-def _write_labeled_matrix(path: Path, labels: List[str], matrix: np.ndarray) -> None:
-  with path.open("w", newline="") as handle:
-    writer = csv.writer(handle)
-    writer.writerow(["state"] + labels)
-    for label, row in zip(labels, matrix, strict=True):
-      writer.writerow([label] + [_format_complex_entry(val) for val in row])
 
 
 def _g_factor_for_level(level) -> float:
@@ -118,9 +151,6 @@ def _g_factor_for_level(level) -> float:
   raise ValueError(f"Level {level} not found in Yb171 data.")
 
 
-G_S = 2.00231930436092
-G_L = 0.99999679
-G_I = -0.0005362
 
 
 def lande_g_factors(F: float, I: float, J: float, L: float, S: float) -> tuple[float, float]:
@@ -182,49 +212,6 @@ def _set_y_limits(ax, data: np.ndarray | None, default: tuple[float, float], pad
     ax.set_ylim(low - pad, high + pad)
 
 
-def _record_timing(name: str, elapsed: float) -> None:
-  """Accumulate timing statistics for the timed decorator."""
-  stats = FUNCTION_TIMINGS.setdefault(name, {'count': 0, 'total': 0.0, 'max': 0.0})
-  stats['count'] += 1
-  stats['total'] += elapsed
-  if elapsed > stats['max']:
-    stats['max'] = elapsed
-
-
-def timed(func=None, *, label: str | None = None):
-  """Decorator to time a function and log its elapsed duration."""
-  def decorator(fn):
-    name = label or fn.__name__
-
-    @wraps(fn)
-    def wrapper(*args, **kwargs):
-      start = time.perf_counter()
-      try:
-        return fn(*args, **kwargs)
-      finally:
-        elapsed = time.perf_counter() - start
-        _record_timing(name, elapsed)
-
-    return wrapper
-
-  if func is None:
-    return decorator
-  return decorator(func)
-
-
-def print_timing_summary() -> None:
-  if not FUNCTION_TIMINGS:
-    print("Timing summary: no calls recorded.")
-    return
-  print("Timing summary (seconds):")
-  for name in sorted(FUNCTION_TIMINGS):
-    stats = FUNCTION_TIMINGS[name]
-    avg = stats['total'] / stats['count']
-    print(
-      f" {name}: count={stats['count']}, total={stats['total']:.6f}, "
-      f"avg={avg:.6f}, max={stats['max']:.6f}"
-    )
-
 
 def _param_signature(params: Dict[str, float]) -> str:
   """Build a deterministic signature string from CACHE_KEYS values."""
@@ -238,6 +225,7 @@ def _param_signature(params: Dict[str, float]) -> str:
 
 
 def load_cache() -> Dict[str, dict]:
+  """Load cache entries from the JSON-lines cache file."""
   if not CACHE_FILE.exists():
     return {}
   cache: Dict[str, dict] = {}
@@ -275,9 +263,9 @@ def wigner_3j(j1: float, j2: float, j3: float, m1: float, m2: float, m3: float) 
 
 
 def _clebsch_gordan(j1: float, m1: float, j2: float, m2: float, J: float, M: float) -> float:
-  
+  """Compute a Clebsch-Gordan coefficient via Wigner-3j."""
   # Use integer parity for the phase to avoid complex results from float powers
-  exp2 = int(round(2.0 * (-j1 -+j2 - M))) # 2*(j1 - j2 + M) should be integer
+  exp2 = int(round(2.0 * (j1 - j2 + M)))  # 2*(j1 - j2 + M) should be integer
   phase = 1.0 if (exp2 % 2 == 0) else -1.0
   w3 = wigner_3j(j1, j2, J, m1, m2, -M)
   
@@ -304,23 +292,20 @@ def hyperfine_angular_factor(Jp: float, Fp: float, J: float, F: float, I: float 
   sixj = wigner_6j(Jp, Fp, I, F, J, 1.0)
   return phase * prefac * sixj
 
+def _rme_eq54(beta: float, omega: float, tau: float, Je: float) -> float:
+  """Reduced matrix element via Eq. (54): sqrt((2Je+1) * 3π ε0 ħ c^3 β / (ω^3 τ))."""
+  pref = (2 * Je + 1)
+  num = 3 * np.pi * consts.epsilon_0 * consts.hbar * (consts.c ** 3) * beta * pref
+  denom = (omega ** 3) * tau
+  return math.sqrt(num / denom)
 
-def hyperfine_energy(J: float, F: float, A_GHz: float, B_field_G: float = 5.0, quadratic_Hz_per_G2: float = 0.0) -> float:
-  """Return hyperfine shift (rad/s) using ΔE = 0.5 * A * K, plus optional quadratic term.
 
-  - J: electronic angular momentum
-  - F: total angular momentum (J + I)
-  - A_GHz: magnetic dipole constant in GHz
-  - B_field_G: magnetic field in gauss (for quadratic Zeeman placeholder)
-  - quadratic_Hz_per_G2: optional Hz·G^-2 term added for S1/2
-  """
-  I = I_NUCLEAR
-  K = F * (F + 1) - J * (J + 1) - I * (I + 1)
-  A_rad = A_GHz * 1e9 * 2 * np.pi  # GHz → Hz → rad/s
-  delta_E = 0.5 * A_rad * K
-  quad = (quadratic_Hz_per_G2 * (B_field_G ** 2)) * 2 * np.pi if quadratic_Hz_per_G2 != 0.0 else 0.0
-  return delta_E + quad
-
+# Compute reduced dipole matrix elements (C·m) from diagram parameters
+REDUCED_E1_ELEMENTS = {
+  "2S12_to_2P12": _rme_eq54(BR_P12_TO_S12, OMEGA_369, TAU_P12, Je=0.5)/_EA0,
+  "2D32_to_2P12": _rme_eq54(BR_P12_TO_D32, OMEGA_2400, TAU_P12, Je=0.5)/_EA0,
+  "2S12_to_2D32": _rme_eq54(0.982, OMEGA_435, TAU_D32, Je=1.5)/_EA0,
+}
 
 def e1_matrix_element(
   transition: str,
@@ -391,72 +376,6 @@ E1_DATA_HF: Dict[str, Dict[int, List[Tuple[Tuple[str, float, float], Tuple[str, 
 CACHE_FILE = Path(__file__).parent / "precomputed_runs.csv"
 CACHE_KEYS = ["B_G", "delta_drive_MHz", "delta_rep_MHz", "delta_c_MHz", "g_cav_MHz", "amp_driv_MHz", "amp_rep_MHz", "drive_t0_us", "drive_sigma_us", "rep_t0_us", "rep_sigma_us", "gamma_SP", "gamma_DP", "gamma_SD", "kappa_MHz", "system"]
 
-# Reduced E1 matrix elements (C·m) for the Yb⁺ manifolds used here.
-_EA0 = consts.e * consts.physical_constants["Bohr radius"][0]
-
-# Diagram-derived lifetimes, branching ratios, and angular frequencies
-TAU_P12 = 8.07e-9       # 6p 2P1/2
-TAU_D32 = 52.7e-3       # 5d 2D3/2
-BR_P12_TO_S12 = 0.995
-BR_P12_TO_D32 = 0.005
-OMEGA_369 = 2 * np.pi * consts.c / 369.5262e-9   # P1/2 <-> S1/2
-OMEGA_2400 = 2 * np.pi * consts.c / 2.400e-6     # P1/2 <-> D3/2
-OMEGA_435 = 2 * np.pi * consts.c / 435.5e-9      # D3/2 <-> S1/2
-
-
-def _rme_eq54(beta: float, omega: float, tau: float, Je: float) -> float:
-  """Reduced matrix element via Eq. (54): sqrt((2Je+1) * 3π ε0 ħ c^3 β / (ω^3 τ))."""
-  pref = (2 * Je + 1)
-  num = 3 * np.pi * consts.epsilon_0 * consts.hbar * (consts.c ** 3) * beta * pref
-  denom = (omega ** 3) * tau
-  return math.sqrt(num / denom)
-
-
-# Compute reduced dipole matrix elements (C·m) from diagram parameters
-REDUCED_E1_ELEMENTS = {
-  "2S12_to_2P12": _rme_eq54(BR_P12_TO_S12, OMEGA_369, TAU_P12, Je=0.5)/_EA0,
-  "2D32_to_2P12": _rme_eq54(BR_P12_TO_D32, OMEGA_2400, TAU_P12, Je=0.5)/_EA0,
-  "2S12_to_2D32": _rme_eq54(0.982, OMEGA_435, TAU_D32, Je=1.5)/_EA0,
-}
-
-
-
-
-
-def rabi_frequencies(E0_driv: float, E0_rep: float) -> Tuple[float, float]:
-  """Compute Ω_driv and Ω_rep (rad/s) for Eqs. 2.4.12 and 2.4.13.
-
-  Uses Eq. 2.1.8 with ħ = 1. The polarization geometry factor (ε·d)
-  is handled by the Clebsch-Gordan structure inside the sigma operators
-  built in this module, so here Ω = E0 in rad/s.
-
-  Parameters
-  - E0_driv: driving laser field amplitude (rad/s scale)
-  - E0_rep: repump laser field amplitude (rad/s scale)
-  """
-  return float(E0_driv) / 2.0, float(E0_rep) / 2.0
-
-
-def omega_drive(t: float, args: Dict[str, float]) -> float:
-  """Gaussian drive envelope Ω_drive(t)."""
-  amp = float(args.get("drive_amp", 0.0))
-  t0 = float(args.get("drive_t0", 0.0))
-  sigma = float(args.get("drive_sigma", 0.0))
-  if sigma <= 0.0:
-    return 0.0
-  return amp * math.exp(-0.5 * ((t - t0) / sigma) ** 2)
-
-
-def omega_rep(t: float, args: Dict[str, float]) -> float:
-  """Gaussian repump envelope Ω_rep(t)."""
-  amp = float(args.get("rep_amp", 0.0))
-  t0 = float(args.get("rep_t0", 0.0))
-  sigma = float(args.get("rep_sigma", 0.0))
-  if sigma <= 0.0:
-    return 0.0
-  return amp * math.exp(-0.5 * ((t - t0) / sigma) ** 2)
-
-
 
 #This maps the m_j states to integer indicies so we can build loops with correct indexing later on 
 def state_index(level: Level, m: float) -> int:
@@ -470,9 +389,25 @@ def state_index(level: Level, m: float) -> int:
   raise ValueError(f"Unknown state ({level}, {m})")
 
 
+
+# This computes the change in m_j for a given transition, this is used to determine the the transition type, and the polarization of a transition
+def delta_mj(m_lower: float, m_upper: float) -> int:
+  """Return Δm_j = m_upper - m_lower in {-1,0,+1} (rounded to nearest int)."""
+  return int(round(m_upper - m_lower))
+
+# The way we are dealing with different polarizations is to create sepereate systems for each component. (Think about how gravity only effects vertical motion, not horizontal motion)
+# This dictionary maps the change in m_j to its corresponding polarization. We can use this to build separate Hamiltonians for each polarization component.
+_q_to_label = {+1: 'left', 0: 'pi', -1: 'right'}
+
+
+# This one just returns the index of a state in the local basis
+def _index_from_local(level: Level, m: float) -> int:
+  """Wrapper to reuse state_index in places that expect an index callback."""
+  return state_index(level, m)
+
+
 # This maps Clebsh-Gordan coefficients to a Tuple which can then iterate over to get dipole moments for transitions 
 # Generalized CGC computation using Wigner-3j and Yb171 J values
-
 def _mj_values(J: float) -> List[float]:
   """Return the list of m_j values for a given total angular momentum J."""
   twoJ = int(round(2 * J))
@@ -516,6 +451,7 @@ CGC_DATA = cgc_lists_general()
 
 # Precompute E1 angular factors (replace raw CGCs)
 def precompute_e1_coeffs(is_bosonic: bool) -> Dict[str, Dict[int, List[Tuple[Tuple[Level, float], Tuple[Level, float], float]]]]:
+  """Precompute E1 coefficients in the local basis for bosonic/fermionic paths."""
   coeffs: Dict[str, Dict[int, List[Tuple[Tuple[Level, float], Tuple[Level, float], float]]]] = {'SP': {+1: [], 0: [], -1: []}, 'DP': {+1: [], 0: [], -1: []}}
   # Map pair -> reduced element key
   reduced_map = {'SP': "2S12_to_2P12", 'DP': "2D32_to_2P12"}
@@ -587,41 +523,48 @@ def precompute_e1_coeffs_hyperfine() -> Dict[str, Dict[int, List[Tuple[Tuple[str
             if coeff == 0.0:
               continue
             coeffs[pair][q].append(((lower_level, F_lower, mF_lower), (upper_level, F_upper, mF_upper), coeff))
-  if not globals().get("_HF_E1_DEBUG_PRINTED", False):
-    counts = {pair: {q: len(entries) for q, entries in coeffs[pair].items()} for pair in coeffs}
-    print(f"Hyperfine E1 coefficients (counts per q): {counts}")
-    for pair in ("SP", "DP"):
-      for q in (+1, 0, -1):
-        samples = coeffs[pair][q][:3]
-        if samples:
-          print(f"{pair} q={q} samples: {samples}")
-    globals()["_HF_E1_DEBUG_PRINTED"] = True
   return coeffs
-
-
-def precompute_e1_coeffs_hf() -> Dict[str, Dict[int, List[Tuple[Tuple[str, float, float], Tuple[str, float, float], float]]]]:
-  """Alias for precompute_e1_coeffs_hyperfine (compatibility)."""
-  return precompute_e1_coeffs_hyperfine()
 
 
 E1_DATA_HF = precompute_e1_coeffs_hyperfine()
 
 
 
-# This computes the change in m_j for a given transition, this is used to determine the the transition type, and the polarization of a transition
-def delta_mj(m_lower: float, m_upper: float) -> int:
-  """Return Δm_j = m_upper - m_lower in {-1,0,+1} (rounded to nearest int)."""
-  return int(round(m_upper - m_lower))
-
-# The way we are dealing with different polarizations is to create sepereate systems for each component. (Think about how gravity only effects vertical motion, not horizontal motion)
-# This dictionary maps the change in m_j to its corresponding polarization. We can use this to build separate Hamiltonians for each polarization component.
-_q_to_label = {+1: 'left', 0: 'pi', -1: 'right'}
 
 
-# This one just returns the index of a state in the local basis
-def _index_from_local(level: Level, m: float) -> int:
-  """Wrapper to reuse state_index in places that expect an index callback."""
-  return state_index(level, m)
+def rabi_frequencies(E0_driv: float, E0_rep: float) -> Tuple[float, float]:
+  """Compute Ω_driv and Ω_rep (rad/s) for Eqs. 2.4.12 and 2.4.13.
+
+  Uses Eq. 2.1.8 with ħ = 1. The polarization geometry factor (ε·d)
+  is handled by the Clebsch-Gordan structure inside the sigma operators
+  built in this module, so here Ω = E0 in rad/s.
+
+  Parameters
+  - E0_driv: driving laser field amplitude (rad/s scale)
+  - E0_rep: repump laser field amplitude (rad/s scale)
+  """
+  return float(E0_driv) / 2.0, float(E0_rep) / 2.0
+
+
+def omega_drive(t: float, args: Dict[str, float]) -> float:
+  """Gaussian drive envelope Ω_drive(t)."""
+  amp = float(args.get("drive_amp", 0.0))
+  t0 = float(args.get("drive_t0", 0.0))
+  sigma = float(args.get("drive_sigma", 0.0))
+  if sigma <= 0.0:
+    return 0.0
+  return amp * math.exp(-0.5 * ((t - t0) / sigma) ** 2)
+
+
+def omega_rep(t: float, args: Dict[str, float]) -> float:
+  """Gaussian repump envelope Ω_rep(t)."""
+  amp = float(args.get("rep_amp", 0.0))
+  t0 = float(args.get("rep_t0", 0.0))
+  sigma = float(args.get("rep_sigma", 0.0))
+  if sigma <= 0.0:
+    return 0.0
+  return amp * math.exp(-0.5 * ((t - t0) / sigma) ** 2)
+
 
 
 
@@ -634,15 +577,13 @@ def _build_systems(
   dim: int,
   e1_coeffs: Dict[str, Dict[int, List[Tuple[Tuple[Level, float], Tuple[Level, float], float]]]] | None = None,
 ) -> Dict[str, Qobj]:
-  """Core builder: accumulate three Hamiltonians (left, pi, right).
+  """Build polarization-resolved laser Hamiltonians in the bosonic basis.
 
-  For each CGC-listed transition A,m_A → B,m_B, compute q=Δm and
-  add ½ Ω · CGC (|u><l| + h.c.) into the appropriate system using
-  the fixed Rabi rate Ω provided in Omega_value.
-
-  pair is 'SP' or 'DP' to select which transitions to include.
-  index_of maps (level, m) to local basis index.
-  dim is the local basis dimension (8).
+  This constructs three operators (left, pi, right) by summing allowed
+  transitions for the specified pair. Each transition contributes
+  0.5 * Ω * coeff * (|u><l| + |l><u|) into the polarization channel
+  selected by q = Δm. The returned dict can be lifted into the full
+  cavity ⊗ atom space.
   """
   systems = {name: Qobj(np.zeros((dim, dim), dtype=complex)) for name in ('left', 'pi', 'right')}
   data = e1_coeffs[pair] if e1_coeffs is not None else CGC_DATA[pair]
@@ -650,7 +591,6 @@ def _build_systems(
     for (lower, upper, coeff) in data.get(q_group, []):
       m_l, m_u = lower[1], upper[1]
       q = delta_mj(m_l, m_u)
-      print(f"[{pair}] Δm={q} for {lower}->{upper} (coeff={coeff})")
       if q not in (-1, 0, +1):
         continue
       Omega = float(Omega_value)
@@ -671,7 +611,12 @@ def _build_systems_hf(
   dim: int,
   e1_coeffs_hf: Dict[str, Dict[int, List[Tuple[Tuple[str, float, float], Tuple[str, float, float], float]]]] | None = None,
 ) -> Dict[str, Qobj]:
-  """Hyperfine version: accumulate three Hamiltonians (left, pi, right) over F,mF."""
+  """Build polarization-resolved laser Hamiltonians in the hyperfine basis.
+
+  Mirrors _build_systems but iterates over (F, mF) states using the
+  hyperfine E1 coefficient table. Each term is placed into the channel
+  defined by q = mF' - mF and weighted by the augmented coefficient.
+  """
   systems = {name: Qobj(np.zeros((dim, dim), dtype=complex)) for name in ('left', 'pi', 'right')}
   data = e1_coeffs_hf[pair] if e1_coeffs_hf is not None else E1_DATA_HF[pair]
   for q_group in (-1, 0, +1):
@@ -778,6 +723,7 @@ def precompute_lowering_tensors(N_a: int, N_b: int, dim_atom: int) -> Dict[str, 
 
 
 def precompute_lowering_tensors_hf(N_a: int, N_b: int, dim_atom: int = HF_BASIS_DIM) -> Dict[str, List[Tuple[Qobj, float]]]:
+    """Precompute hyperfine lowering operators in cavity⊗atom space."""
     Ia = qeye(N_a)
     Ib = qeye(N_b)
     tensors: Dict[str, List[Tuple[Qobj, float]]] = {}
@@ -860,6 +806,7 @@ def H_laser_systems_from_E0(E0_driv: float, E0_rep: float, dim: int = 8, e1_coef
 
 @timed()
 def H_laser_systems_from_E0_hf(E0_driv: float, E0_rep: float, dim: int = HF_BASIS_DIM, e1_coeffs_hf=None) -> Dict[str, Qobj]:
+  """Hyperfine laser Hamiltonians using field amplitudes E0 (rad/s scale)."""
   Omega_driv, Omega_rep = rabi_frequencies(E0_driv, E0_rep)
   Hsp = _build_systems_hf('SP', float(Omega_driv), dim, e1_coeffs_hf=e1_coeffs_hf)
   Hdp = _build_systems_hf('DP', float(Omega_rep), dim, e1_coeffs_hf=e1_coeffs_hf)
@@ -878,10 +825,10 @@ def H_interaction_with_cavity(
   N_a: int,
   N_b: int,
 ) -> Dict[str, Qobj]:
-  """Lift atomic laser Hamiltonians to 2-mode cavity ⊗ atom space and add H_a/H_b.
+  """Lift atomic laser Hamiltonians into cavity space and add cavity coupling.
 
-  - left/right get: tensor(I_a, I_b, H_atom_left/right) + H_a/H_b
-  - pi gets:    tensor(I_a, I_b, H_atom_pi) (no cavity coupling)
+  The left/right channels receive the corresponding cavity interaction
+  terms (H_a/H_b), while the pi channel is lifted without cavity coupling.
   """
   # Detect atomic dimension from any provided operator
   sample = next(iter(H_laser_atom.values()))
@@ -905,6 +852,11 @@ def H_interaction_with_cavity_hf(
   N_a: int,
   N_b: int,
 ) -> Dict[str, Qobj]:
+  """Hyperfine version of cavity-lifted laser Hamiltonians.
+
+  Identical structure to H_interaction_with_cavity, but uses hyperfine
+  transition operators in the cavity coupling term.
+  """
   sample = next(iter(H_laser_atom.values()))
   dim_atom = sample.shape[0]
   I_a = qeye(N_a)
@@ -922,6 +874,11 @@ def H_interaction_with_cavity_hf(
 # Bare two-mode cavity Hamiltonian (Eq. 2.4.7): ħ(Δ_c − Δ_rep)(a†a + b†b)
 @timed()
 def H0_cavity(delta_c: float, delta_rep: float, N_a: int, N_b: int, dim_atom: int) -> Qobj:
+  """Bare two-mode cavity Hamiltonian in the rotating frame.
+
+  Implements H_c = (Δ_c − Δ_rep)(a†a + b†b) and lifts it into the
+  cavity ⊗ atom space.
+  """
   coeff = (delta_c - delta_rep)
   I_atom = qeye(dim_atom)
   a = destroy(N_a)
@@ -1017,11 +974,11 @@ def add_bare_terms_to_systems(
   N_a: int | None = None,
   N_b: int | None = None,
 ) -> Dict[str, Qobj]:
-  """Add bare-ion terms and bare-cavity terms to each system.
+  """Combine interaction Hamiltonians with bare atomic/cavity terms.
 
-  - Always adds H_S + H_D to every polarization-resolved Hamiltonian in
-   `H_systems`. If `N_a`, `N_b`, `delta_c`, and `delta_rep` are provided,
-   also adds the two-mode cavity term H0_cavity.
+  Always adds H_S + H_D to each polarization-resolved Hamiltonian. If
+  delta_c, delta_rep, N_a, and N_b are provided, also adds the bare cavity
+  energy term H0_cavity.
   """
   
   out: Dict[str, Qobj] = {}
@@ -1040,135 +997,11 @@ def add_bare_terms_to_systems(
   return out
 
 
-def _simulate_once(params: Dict[str, float], compute_coherence: bool = False) -> tuple[np.ndarray, SimpleNamespace, np.ndarray | None, np.ndarray | None]:
-  """Headless solver for caching/batch runs (no UI widgets)."""
-  use_bos = bool(params.get('is_bosonic', False))
-  dim_atom = 8 if use_bos else HF_BASIS_DIM
-
-  # Projectors and initial state
-  if use_bos:
-    psi0_atom = basis(dim_atom, state_index('S', +0.5))
-    P_S = projector_for_indices([state_index('S', -0.5), state_index('S', +0.5)], dim=dim_atom)
-    P_P = projector_for_indices([state_index('P', -0.5), state_index('P', +0.5)], dim=dim_atom)
-    P_D = projector_for_indices([state_index('D', -1.5), state_index('D', -0.5), state_index('D', +0.5), state_index('D', +1.5)], dim=dim_atom)
-  else:
-    psi0_atom = basis(dim_atom, hf_state_index('S', 0.0, 0.0))
-    P_S = projector_for_level_hf('S', dim=dim_atom)
-    P_P = projector_for_level_hf('P', dim=dim_atom)
-    P_D = projector_for_level_hf('D', dim=dim_atom)
-
-  N_a = 3
-  N_b = 3
-  Ia = qeye(N_a)
-  Ib = qeye(N_b)
-  I_atom = qeye(dim_atom)
-  projector_tensors = {
-    'S': tensor(Ia, Ib, P_S),
-    'P': tensor(Ia, Ib, P_P),
-    'D': tensor(Ia, Ib, P_D),
-  }
-  field_left = tensor(destroy(N_a), Ib, qeye(dim_atom))
-  field_right = tensor(Ia, destroy(N_b), qeye(dim_atom))
-  n_left = field_left.dag() * field_left
-  n_right = field_right.dag() * field_right
-  
-  # Atomic fluorescence operators for coherence (use SP channel)
-  if Bosonic:
-    comps_sp = transition_sigma_components('SP', dim=dim_atom)
-  else:
-    comps_sp = transition_sigma_components_hf('SP', dim=dim_atom)
-  sigma_left = tensor(Ia, Ib, comps_sp.get(+1, qeye(dim_atom)*0))
-  sigma_pi   = tensor(Ia, Ib, comps_sp.get(0, qeye(dim_atom)*0))
-  sigma_right= tensor(Ia, Ib, comps_sp.get(-1, qeye(dim_atom)*0))
-  cavity_loss_ops = [
-    tensor(destroy(N_a), Ib, I_atom),
-    tensor(Ia, destroy(N_b), I_atom),
-  ]
-  lowering_tensors = precompute_lowering_tensors(N_a, N_b, dim_atom) if use_bos else precompute_lowering_tensors_hf(N_a, N_b, dim_atom)
-
-  e1_coeffs = precompute_e1_coeffs(use_bos) if use_bos else precompute_e1_coeffs_hf()
-  B_T = params['B_G'] * 1e-4
-  ddrv = 2 * np.pi * params['delta_drive_MHz'] * 1e6
-  drep = 2 * np.pi * params['delta_rep_MHz'] * 1e6
-  E0_driv = 2 * np.pi * params['amp_driv_MHz'] * 1e6
-  E0_rep = 2 * np.pi * params['amp_rep_MHz'] * 1e6
-
-  if use_bos:
-    Hsp = _build_systems('SP', 1.0, _index_from_local, dim_atom, e1_coeffs=e1_coeffs)
-    Hdp = _build_systems('DP', 1.0, _index_from_local, dim_atom, e1_coeffs=e1_coeffs)
-    H_S = eq_2_4_5_H_S(ddrv, B_T, params['g_S'], dim=dim_atom)
-    H_D = eq_2_4_6_H_D(drep, B_T, params['g_D'], dim=dim_atom)
-  else:
-    Hsp = _build_systems_hf('SP', 1.0, dim_atom, e1_coeffs_hf=e1_coeffs)
-    Hdp = _build_systems_hf('DP', 1.0, dim_atom, e1_coeffs_hf=e1_coeffs)
-    H_S = eq_2_4_5_H_S_hf(ddrv, B_T, params['g_S'], dim=dim_atom)
-    H_D = eq_2_4_6_H_D_hf(drep, B_T, params['g_D'], dim=dim_atom)
-
-  steps = max(100, int(round(params['tmax_us'] * params['density'])))
-  tlist = np.linspace(0, params['tmax_us'] * 1e-6, steps)
-
-  g = 2 * np.pi * params.get('g_cav_MHz', 0.0) * 1e6
-  dc = 2 * np.pi * params['delta_c_MHz'] * 1e6
-
-  H_zero = Qobj(np.zeros((dim_atom, dim_atom), dtype=complex))
-  H_zero_dict = {name: H_zero for name in ('left', 'pi', 'right')}
-  if params['system'] in ('left', 'right'):
-    H_lift = H_interaction_with_cavity(H_zero_dict, g=g, N_a=N_a, N_b=N_b) if use_bos else H_interaction_with_cavity_hf(H_zero_dict, g=g, N_a=N_a, N_b=N_b)
-  else:
-    H_lift = {name: tensor(Ia, Ib, H_atom) for name, H_atom in H_zero_dict.items()}
-  H_full = add_bare_terms_to_systems(H_lift, H_S, H_D, dc, drep, N_a, N_b)
-  H_sp_lift = {name: tensor(Ia, Ib, H_atom) for name, H_atom in Hsp.items()}
-  H_dp_lift = {name: tensor(Ia, Ib, H_atom) for name, H_atom in Hdp.items()}
-  pol = params['system']
-  H = H_full[pol]
-  psi0 = tensor(basis(N_a, 0), basis(N_b, 0), psi0_atom)
-  c_ops = build_collapse_operators(params, lowering_tensors, projector_tensors, cavity_loss_ops)
-  mesolve_opts = solver_options(store_states=compute_coherence)
-  Omega_driv, Omega_rep = rabi_frequencies(E0_driv, E0_rep)
-  args = {
-    "drive_amp": float(Omega_driv),
-    "drive_t0": float(params.get("drive_t0_us", 0.0)) * 1e-6,
-    "drive_sigma": float(params.get("drive_sigma_us", 0.0)) * 1e-6,
-    "rep_amp": float(Omega_rep),
-    "rep_t0": float(params.get("rep_t0_us", 0.0)) * 1e-6,
-    "rep_sigma": float(params.get("rep_sigma_us", 0.0)) * 1e-6,
-  }
-  H_td = [H, [H_sp_lift[pol], omega_drive], [H_dp_lift[pol], omega_rep]]
-  res = mesolve(
-    H_td,
-    psi0,
-    tlist,
-    c_ops=c_ops,
-    e_ops=[projector_tensors['S'], projector_tensors['P'], projector_tensors['D'], n_left, n_right],
-    options=mesolve_opts,
-    args=args,
-  )
-
-  taulist = None
-  g1_tau = None
-  g2_tau = None
-  if compute_coherence and pol in ('left', 'right'):
-    tau_max = params['tau_max_us'] * 1e-6
-    taulist = np.linspace(0.0, tau_max, int(params['n_tau']))
-    field = field_left if pol == 'left' else field_right
-    rho_final = res.states[-1] if res.states else None
-    if rho_final is not None and not rho_final.isoper:
-      rho_final = rho_final * rho_final.dag()
-    if rho_final is not None:
-      _G1, g1_tau, _G2, g2_tau = photon_correlations(
-        H,
-        rho_final,
-        c_ops,
-        field,
-        taulist,
-      )
-
-  return tlist, res, taulist, g1_tau, g2_tau
-
 
 # Convenience: projectors onto manifolds in the local 8-state basis
 @timed()
 def projector_for_indices(indices: List[int], dim: int = 8) -> Qobj:
+  """Projector onto selected indices in the local basis."""
   P = Qobj(np.zeros((dim, dim), dtype=complex))
   for i in indices:
     ket = basis(dim, i)
@@ -1182,7 +1015,13 @@ def build_collapse_operators(
     projector_tensors: Dict[str, Qobj],
     cavity_loss_ops: List[Qobj],
 ) -> List[Qobj]:
-    """Assemble all collapse operators (atomic decay, cavity loss, dephasing)."""
+    """Assemble Lindblad collapse operators for decay, cavity loss, and dephasing.
+
+    SP/DP spontaneous emission channels are distributed across lowering
+    operators with their E1 weights. Cavity loss operators are added when
+    kappa > 0. Dephasing is modeled by projectors onto the S and D manifolds
+    using gamma_SD.
+    """
     c_ops: List[Qobj] = []
 
     gamma_sp = 2 * np.pi * params['gamma_SP'] * 1e6  # MHz -> rad/s
@@ -1299,7 +1138,6 @@ def photon_correlations(
 
 
 
-
 # Interactive UI to explore Yb171+ populations
 @timed()
 def interactive_populations():
@@ -1392,6 +1230,7 @@ def interactive_populations():
   field_right = tensor(Ia, destroy(N_b), qeye(dim_atom))
   n_left = field_left.dag() * field_left
   n_right = field_right.dag() * field_right
+  
   # Atomic fluorescence operators for coherence (use SP channel)
   if use_bosonic:
     comps_sp_int = transition_sigma_components('SP', dim=dim_atom)
@@ -1408,9 +1247,9 @@ def interactive_populations():
 
   @timed(label='build_and_solve')
   def build_and_solve(compute_correlations: bool = False):
-    print(f"Using {'bosonic (8-state mJ)' if params.get('is_bosonic', False) else 'fermionic (16-state hyperfine)'} basis")
+    """Build Hamiltonians, run the solver, and optionally compute correlations."""
     use_bos = bool(params.get('is_bosonic', False))
-    e1_coeffs = precompute_e1_coeffs(use_bos) if use_bos else precompute_e1_coeffs_hf()
+    e1_coeffs = precompute_e1_coeffs(use_bos) if use_bos else precompute_e1_coeffs_hyperfine()
     B_T = params['B_G'] * 1e-4
     ddrv = 2 * np.pi * params['delta_drive_MHz'] * 1e6
     drep = 2 * np.pi * params['delta_rep_MHz'] * 1e6
@@ -1428,16 +1267,6 @@ def interactive_populations():
       Hdp = _build_systems_hf('DP', 1.0, dim_atom, e1_coeffs_hf=e1_coeffs)
       H_S = eq_2_4_5_H_S_hf(ddrv, B_T, params['g_S'], dim=dim_atom)
       H_D = eq_2_4_6_H_D_hf(drep, B_T, params['g_D'], dim=dim_atom)
-
-    if not globals().get("_HF_DRIVE_DEBUG_PRINTED", False):
-      try:
-        max_sp = {name: float(np.max(np.abs(Hsp[name].full()))) for name in Hsp}
-        max_dp = {name: float(np.max(np.abs(Hdp[name].full()))) for name in Hdp}
-        print(f"[drive-debug] max|Hsp| per pol: {max_sp}")
-        print(f"[drive-debug] max|Hdp| per pol: {max_dp}")
-      except Exception as exc:
-        print(f"[drive-debug] failed to inspect Hsp/Hdp: {exc}")
-      globals()["_HF_DRIVE_DEBUG_PRINTED"] = True
 
     steps = max(50, int(round(params['tmax_us'] * params['density'])))
     tlist = np.linspace(0, params['tmax_us'] * 1e-6, steps)
@@ -1494,20 +1323,6 @@ def interactive_populations():
       "rep_sigma": float(params.get("rep_sigma_us", 0.0)) * 1e-6,
     }
     H_td = [H, [H_sp_lift[pol], omega_drive], [H_dp_lift[pol], omega_rep]]
-    # Debug: show envelope + operator norms for the chosen polarization.
-    env_peak = omega_drive(args["drive_t0"], args)
-    env_rep_peak = omega_rep(args["rep_t0"], args)
-    hsp_norm = float((H_sp_lift[pol].norm()))
-    hdp_norm = float((H_dp_lift[pol].norm()))
-    print(
-      "[drive-debug] pol=", pol,
-      "Hsp_norm=", f"{hsp_norm:.3e}",
-      "Hdp_norm=", f"{hdp_norm:.3e}",
-      "drive_amp=", f"{args['drive_amp']:.3e}",
-      "rep_amp=", f"{args['rep_amp']:.3e}",
-      "drive_peak=", f"{env_peak:.3e}",
-      "rep_peak=", f"{env_rep_peak:.3e}",
-    )
     res = mesolve(
       H_td,
       psi0,
@@ -1572,6 +1387,7 @@ def interactive_populations():
   xR = 0.55
 
   def row_y(i):
+    """Return the y-position for the ith control row."""
     return y0 - i * (row_h + gap)
 
   ax_BG   = plt.axes([xL, row_y(0), wC, row_h], facecolor=axcolor)
@@ -1672,6 +1488,7 @@ def interactive_populations():
   ax_g2.legend(loc='upper right')
 
   def recompute(_=None, compute_corr: bool = False):
+    """Recompute dynamics from current UI controls and refresh plots."""
     params['B_G'] = s_BG.val
     params['tmax_us'] = s_tmax.val
     params['density'] = float(s_dense.val)
@@ -1734,94 +1551,6 @@ def interactive_populations():
   plt.show()
   print_timing_summary()
 
-
-def pulse_example() -> None:
-  """Minimal example: run a Gaussian-pulsed drive/repump simulation."""
-  params = {
-    "B_G": 5.0,
-    "delta_drive_MHz": 0.0,
-    "delta_rep_MHz": 0.0,
-    "delta_c_MHz": 0.0,
-    "g_cav_MHz": 0.0,
-    "amp_driv_MHz": 10.0,
-    "amp_rep_MHz": 5.0,
-    "drive_t0_us": 5.0,
-    "drive_sigma_us": 1.0,
-    "rep_t0_us": 5.0,
-    "rep_sigma_us": 1.0,
-    "tmax_us": 20.0,
-    "density": 10.0,
-    "gamma_SP": 0.03,
-    "gamma_DP": 0.034,
-    "gamma_SD": 0.000136,
-    "kappa_MHz": 0.0,
-    "system": "left",
-    "is_bosonic": False,
-    "tau_max_us": 0.2,
-    "n_tau": 10,
-  }
-  tlist, res, *_ = _simulate_once(params, compute_coherence=False)
-  print("Pulse example final populations:", res.expect[0][-1], res.expect[1][-1], res.expect[2][-1])
-
-
-def run_precompute_batch():
-  """Batch precompute a coarse grid and write results to the cache file."""
-  base_params = dict(
-    B_G=2.0,
-    delta_drive_MHz=20.0,
-    delta_rep_MHz=2.0,
-    delta_c_MHz=2.0,
-    g_S=g_s,
-    g_D=g_d,
-    gamma_SP=0.03,
-    gamma_DP=0.034,
-    gamma_SD=0.000136,
-    kappa_MHz=0.5,
-    tmax_us=30.0,
-    density=8.0,
-    system='pi',
-    is_bosonic=False,
-    amp_driv_MHz=30.0,
-    amp_rep_MHz=0.0,
-    tau_max_us=0.2,
-    n_tau=5,
-    g_cav_MHz=0.5,
-    use_cache=False,
-  )
-  grids = {
-    'B_G': [0.0, 5.0, 10.0, 20.0],
-    'delta_drive_MHz': [-3.0, -1.0, 0.0, 1.0, 3.0],
-    'delta_rep_MHz': [-3.0, -1.0, 0.0, 1.0, 3.0],
-    'amp_driv_MHz': [0.0, 5.0, 10.0, 20.0, 30.0],
-    'amp_rep_MHz': [0.0, 5.0, 10.0, 20.0],
-  }
-  combos = []
-  for B in grids['B_G']:
-    for dd in grids['delta_drive_MHz']:
-      for dr in grids['delta_rep_MHz']:
-        for od in grids['amp_driv_MHz']:
-          for orp in grids['amp_rep_MHz']:
-            combos.append(dict(B_G=B, delta_drive_MHz=dd, delta_rep_MHz=dr, amp_driv_MHz=od, amp_rep_MHz=orp))
-  print(f"Running batch for {len(combos)} combinations...")
-  for i, c in enumerate(combos, 1):
-    p = base_params.copy()
-    p.update(c)
-    sig = _param_signature(p)
-    tlist, res, taulist, g1, g2 = _simulate_once(p, compute_coherence=False)
-    entry = {
-      "sig": sig,
-      "params": {k: p.get(k, None) for k in CACHE_KEYS},
-      "t": tlist.tolist(),
-      "P_S": np.array(res.expect[0]).tolist(),
-      "P_P": np.array(res.expect[1]).tolist(),
-      "P_D": np.array(res.expect[2]).tolist(),
-      "tau": taulist.tolist() if taulist is not None else [],
-      "g1": g1.tolist() if g1 is not None else [],
-      "g2": g2.tolist() if g2 is not None else [],
-    }
-    save_cache_entry(entry)
-    if i % 50 == 0:
-      print(f"Saved {i}/{len(combos)}")
 
 if __name__ == "__main__":
   interactive_populations()
