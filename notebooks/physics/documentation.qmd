@@ -1,6 +1,5 @@
 ---
 title: CAIPE
-author: Nikhail Virik
 ---
 
 ## Introduction

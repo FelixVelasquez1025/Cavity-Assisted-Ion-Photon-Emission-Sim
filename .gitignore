@@ -214,3 +214,6 @@ __marimo__/
 **/*.pdf
 **/*_files
 **/*.pptx
+
+# Simulation output belongs outside the source package
+outputs/

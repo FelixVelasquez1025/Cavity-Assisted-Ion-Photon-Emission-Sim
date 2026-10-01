@@ -1,6 +1,16 @@
 """
 Rabi flopping on a two-level system using QuTiP.
 
+Paper mapping (examples/rabi_hamiltonian.qmd):
+- Implements the section "Hamiltonian for the Two Level System".
+- H0: `wc * a^\dag a` (cavity) and `(wa/2) * sz` (atom) correspond to the
+  free/cavity and atomic inversion energies described as H0 in the doc.
+- Interaction (RWA): `g * (a * sigma_+ + a^\dag * sigma_-)` is the
+  Jaynes–Cummings Hamiltonian in the doc.
+- Interaction (non‑RWA): `g * (a + a^\dag) * (sigma_- + sigma_+)` matches the
+  pre‑RWA light–matter coupling form.
+- Collapse operators: cavity damping (kappa, n_th) and atomic decay (gamma)
+  implement the Lindblad terms used in the master‑equation `mesolve` solver.
 """
 from __future__ import annotations
 import numpy as np
@@ -31,6 +41,8 @@ sp = tensor(qeye(N), sigmap())          # sigma_+ (raising)
 sz = tensor(qeye(N), sigmaz())
 
 # Hamiltonian with and without RWA
+# Paper: Two-level Hamiltonian (RWA vs full). See the two-level section
+# in examples/rabi_hamiltonian.qmd for the explicit forms and symbols.
 if use_rwa:
     # Jaynes–Cummings Hamiltonian under RWA: g (a σ+ + a† σ−)
     H = wc * a.dag() * a + (wa / 2) * sz + g * (a * sp + a.dag() * sm)
@@ -38,8 +50,11 @@ else:
     # Full (non-RWA) light–matter coupling: g (a + a†)(σ− + σ+)
     H = wc * a.dag() * a + (wa / 2) * sz + g * (a.dag() + a) * (sm + sp)
 
-# Create a list of collapse operators 
+# Create a list of collapse operators
 c_op_list = []
+# Paper: Master equation dissipators. Cavity bath via kappa and n_th,
+# and atomic spontaneous emission via gamma, as discussed alongside the
+# two-level Hamiltonian and the use of `mesolve`.
 
 # Photon annihilation
 rate = kappa * (1 + n_th_a)

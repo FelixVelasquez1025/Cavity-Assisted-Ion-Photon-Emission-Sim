@@ -1,29 +1,28 @@
-"""
-Entry point for running the Yb171+ interactive simulation.
-
-This keeps the `examples/rabi_flopping_Yb171.py` script intact and simply
-loads it to launch the UI. A thin wrapper is provided to allow for future
-atom selection; at present only Yb171 is supported.
-"""
+"""Command-line entry point for the pulse-enabled Yb-171 simulator."""
 
 from __future__ import annotations
-import sys
+
+import argparse
 from pathlib import Path
 
-# Allow running as a script or as a module
-if __package__ is None:
-    src_root = Path(__file__).resolve().parents[1]  # .../src
-    if str(src_root) not in sys.path:
-        sys.path.insert(0, str(src_root))
-    from caipe_sim.interactive_ui import interactive_populations
-else:
-    from .interactive_ui import interactive_populations
 
+def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--demo", action="store_true", help="Export a small CPU simulation without opening windows"
+    )
+    parser.add_argument(
+        "--output", type=Path, default=Path("outputs"), help="Demo output directory (default: outputs)"
+    )
+    args = parser.parse_args()
+    if args.demo:
+        from .demo import export_demo
 
-def main(atom: str = "Yb171") -> None:
-    """Launch the interactive populations UI."""
-    _ = atom  # placeholder for future atom selection, eventually want to make it so we can have a choice between what aroms to run 
-    interactive_populations()
+        export_demo(args.output)
+    else:
+        from .yb171_simulator import interactive_populations
+
+        interactive_populations()
 
 
 if __name__ == "__main__":

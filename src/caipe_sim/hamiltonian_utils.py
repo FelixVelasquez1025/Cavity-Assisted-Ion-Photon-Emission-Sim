@@ -348,7 +348,7 @@ def precompute_e1_coeffs_hf() -> Dict[str, Dict[int, List[Tuple[Tuple[str, float
                             coeff = e1_matrix_element(
                                 trans_key,
                                 q,
-                                bosonic=True,
+                                bosonic=False,  # hyperfine (fermionic) path
                                 Jp=J_upper,
                                 J=J_lower,
                                 Fp=F_upper,
@@ -358,10 +358,11 @@ def precompute_e1_coeffs_hf() -> Dict[str, Dict[int, List[Tuple[Tuple[str, float
                                 I=I_NUCLEAR,
                             )
                         except Exception:
-                            continue
-                        if coeff == 0.0:
-                            continue
-                        coeffs[pair][q].append(((lower_level, F_lower, mF_lower), (upper_level, F_upper, mF_upper), coeff))
+                            coeff = 0.0
+                        # Keep zero-valued elements for complete bookkeeping.
+                        coeffs[pair][q].append(
+                            ((lower_level, F_lower, mF_lower), (upper_level, F_upper, mF_upper), coeff)
+                        )
     return coeffs
 
 

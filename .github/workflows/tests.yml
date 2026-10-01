@@ -1,0 +1,24 @@
+name: CPU validation
+
+on: [push, pull_request]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install the package and test runner
+        run: python -m pip install . pytest
+      - name: Validate hyperfine and pulse dynamics
+        env:
+          MPLBACKEND: Agg
+        run: python -m pytest
+      - name: Export the CPU demo
+        run: caipe-sim --demo
+      - uses: actions/upload-artifact@v4
+        with:
+          name: yb171-demo
+          path: outputs/

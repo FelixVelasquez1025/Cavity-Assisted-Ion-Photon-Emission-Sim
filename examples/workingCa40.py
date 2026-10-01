@@ -1,15 +1,20 @@
 from __future__ import annotations
-
 import math
 from typing import Dict, List, Tuple, Callable
-
 import numpy as np
 from qutip import Qobj, basis, destroy, qeye, tensor, mesolve
 import matplotlib.pyplot as plt
 from matplotlib.widgets import Slider, RadioButtons
 from scipy import constants as consts
-from atomic_physics.ions.ca40 import Ca40  
-
+# Import Yb171 ion definition. If the custom repo is a sibling of this project
+import os, sys
+try:
+    from atomic_physics.ions.Yb171 import Yb171  # type: ignore
+except Exception:
+    repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'atomic_physics_wth_Yb171'))
+    if repo_root not in sys.path:
+        sys.path.insert(0, repo_root)
+    from atomic_physics.ions.Yb171 import Yb171  # type: ignore
 from sympy import S as _S
 from sympy.physics.wigner import wigner_3j as _sympy_wigner_3j
 
@@ -46,7 +51,7 @@ MU_B = consts.physical_constants["Bohr magneton"][0] / consts.hbar
 
 
 # Lande g-factors
-g_s = next(ld.g_J for ld in Ca40.level_data if ld.level == Ca40.S12)
+g_s = next(ld.g_J for ld in Yb171.level_data if ld.level == Yb171.S12)
 
 
 def rabi_frequencies(E0_driv: float, E0_rep: float) -> Tuple[float, float]:
@@ -74,7 +79,7 @@ def state_index(level: Level, m: float) -> int:
 
 
 # This maps Clebsh-Gordan coefficients to a Tuple which can then iterate over to get dipole moments for transitions 
-# Generalized CGC computation using Wigner-3j and Ca40 J values
+# Generalized CGC computation using Wigner-3j and Yb171 J values
 def _mj_values(J: float) -> List[float]:
     twoJ = int(round(2 * J))
     return [(-twoJ + k) / 2.0 for k in range(0, 2 * twoJ + 1)]
@@ -99,9 +104,9 @@ def _e1_cgc(j_lower: float, m_lower: float, j_upper: float, m_upper: float) -> f
 
 
 def cgc_lists_general() -> Dict[str, Dict[int, List[Tuple[Tuple[Level, float], Tuple[Level, float], float]]]]:
-    J_S = float(Ca40.S12.J)
-    J_P = float(Ca40.P12.J)
-    J_D = float(Ca40.D32.J)
+    J_S = float(Yb171.S12.J)
+    J_P = float(Yb171.P12.J)
+    J_D = float(Yb171.D32.J)
 
     def build_pair(lower_label: Level, j_lower: float, upper_label: Level, j_upper: float):
         out: Dict[int, List[Tuple[Tuple[Level, float], Tuple[Level, float], float]]] = {+1: [], 0: [], -1: []}
@@ -375,7 +380,7 @@ def projector_for_indices(indices: List[int], dim: int = 8) -> Qobj:
 
 
 
-# Interactive UI to explore Ca40+ populations
+# Interactive UI to explore Yb171+ populations
 def interactive_populations():
     """Interactive UI: sliders for Δ_c, Δ_rep, Δ_driv (MHz) and B (G),
     plus a radio selector for polarization system (left, pi, right).
@@ -478,7 +483,7 @@ def interactive_populations():
     ax.set_xlabel('Time (us)')
     ax.set_ylabel('Population')
     ax.set_ylim(0, 1.05)
-    ax.set_title('Ca40+ populations')
+    ax.set_title('Yb171+ populations')
     ax.grid(True, alpha=0.3)
     ax.legend(loc='upper right')
 
