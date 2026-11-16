@@ -47,12 +47,12 @@ BR_P12_to_D32 = 0.005
 # Einstein A coefficients for each transition (Using formula: A = 1/tau * (branching ratio)  )
 A_P12_total   = 1.0 / tau_P12                 
 A_369_to_S12  = BR_P12_to_S12 * A_P12_total   # P1/2 -> S1/2
-A_2400_to_D32 = BR_P12_to_D32 * A_P12_total   # P1/2 -> D3/2
+A_2438_to_D32 = BR_P12_to_D32 * A_P12_total   # P1/2 -> D3/2
 A_D32_to_S12  = 1.0 / tau_D32                 # D3/2 -> S1/2 
 
 # Angular frequencies (Using formula: ω = 2πc/λ)
 omega_369  = 2 * np.pi * consts.c / (369.5262e-9)   # S1/2 <-> P1/2
-omega_2400 = 2 * np.pi * consts.c / (2.400e-6)      # D3/2 <-> P1/2 
+omega_2438 = 2 * np.pi * consts.c / (2.438e-6)      # D3/2 <-> P1/2
 omega_435  = 2 * np.pi * consts.c / (435.5e-9)      # S1/2 <-> D3/2 
 
 # I for Yb-171 is always 1/2 
@@ -131,11 +131,11 @@ class Yb171Factory:
                 frequency=omega_369,       
             ),
 
-            "2400": Transition(
+            "2438": Transition(
                 lower=self.D32,
                 upper=self.P12,
-                einstein_A=A_2400_to_D32,  
-                frequency=omega_2400,      
+                einstein_A=A_2438_to_D32,
+                frequency=omega_2438,
             ),
 
             "435": Transition(

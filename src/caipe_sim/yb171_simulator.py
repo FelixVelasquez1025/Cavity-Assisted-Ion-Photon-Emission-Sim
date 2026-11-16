@@ -105,7 +105,7 @@ TAU_D32 = 52.7e-3       # 5d 2D3/2
 BR_P12_TO_S12 = 0.995
 BR_P12_TO_D32 = 0.005
 OMEGA_369 = 2 * np.pi * consts.c / 369.5262e-9   # P1/2 <-> S1/2
-OMEGA_2400 = 2 * np.pi * consts.c / 2.400e-6     # P1/2 <-> D3/2
+OMEGA_2438 = 2 * np.pi * consts.c / 2.438e-6     # P1/2 <-> D3/2
 OMEGA_435 = 2 * np.pi * consts.c / 435.5e-9      # D3/2 <-> S1/2
 
 
@@ -308,7 +308,7 @@ def _rme_eq54(beta: float, omega: float, tau: float, Je: float) -> float:
 # Compute reduced dipole matrix elements (C·m) from diagram parameters
 REDUCED_E1_ELEMENTS = {
   "2S12_to_2P12": _rme_eq54(BR_P12_TO_S12, OMEGA_369, TAU_P12, Je=0.5)/_EA0,
-  "2D32_to_2P12": _rme_eq54(BR_P12_TO_D32, OMEGA_2400, TAU_P12, Je=0.5)/_EA0,
+  "2D32_to_2P12": _rme_eq54(BR_P12_TO_D32, OMEGA_2438, TAU_P12, Je=0.5)/_EA0,
   "2S12_to_2D32": _rme_eq54(0.982, OMEGA_435, TAU_D32, Je=1.5)/_EA0,
 }
 
