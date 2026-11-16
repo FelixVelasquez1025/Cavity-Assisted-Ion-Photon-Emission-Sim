@@ -15,6 +15,7 @@ def run_rabi_validation() -> dict:
     reset coupling, and bare terms are off, isolating S(F=0,mF=0) and
     P(F=1,mF=0). The cavity truncation follows the shared application default.
     """
+    # Tight integration isolates numerical error in the analytic comparison.
     n = DEFAULT_FOCK_DIMENSION
     ground = model.hf_state_index("S", 0.0, 0.0)
     excited = model.hf_state_index("P", 1.0, 0.0)
@@ -26,7 +27,7 @@ def run_rabi_validation() -> dict:
     p_e = tensor(qeye(n), qeye(n), basis(16, excited).proj())
     result = mesolve(
         [h*0, [h, model.omega_drive]], psi0, times,
-        e_ops=[p_e], args=args, options=model.solver_options(),
+        e_ops=[p_e], args=args, options={**model.solver_options(), "atol": 1e-10, "rtol": 1e-8},
     )
     sigma, t0 = args["drive_sigma"], args["drive_t0"]
     area = args["drive_amp"]*sigma*np.sqrt(np.pi/2)*(

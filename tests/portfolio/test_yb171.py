@@ -44,7 +44,7 @@ def test_cavity_coupling_is_hermitian():
 def test_gaussian_pi_pulse_matches_analytic_rabi_solution():
     data = run_rabi_validation()
     assert data["analytic"].max() > .1
-    np.testing.assert_allclose(data["simulated"], data["analytic"], atol=2e-5)
+    np.testing.assert_allclose(data["simulated"], data["analytic"], atol=2e-6, rtol=0)
 
 
 
