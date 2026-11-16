@@ -6,6 +6,7 @@ in ``examples/rabi_flopping_Yb171.py``
 """
 
 from __future__ import annotations
+from caipe_sim.Yb171 import WAVELENGTH_DP_M, WAVELENGTH_SD_M
 
 import math
 from typing import Callable, Dict, List, Tuple
@@ -232,8 +233,8 @@ TAU_D32 = 52.7e-3  # 5d 2D3/2
 BR_P12_TO_S12 = 1.0 - 0.00501
 BR_P12_TO_D32 = 0.00501
 OMEGA_369 = 2 * np.pi * consts.c / 369.52604e-9  # P1/2 <-> S1/2
-OMEGA_2438 = 2 * np.pi * consts.c / 2.438e-6  # P1/2 <-> D3/2
-OMEGA_435 = 2 * np.pi * consts.c / 435.5e-9  # D3/2 <-> S1/2
+OMEGA_2438 = 2 * np.pi * consts.c / WAVELENGTH_DP_M  # P1/2 <-> D3/2
+OMEGA_435 = 2 * np.pi * consts.c / WAVELENGTH_SD_M  # D3/2 <-> S1/2
 
 
 def _rme_eq54(beta: float, omega: float, tau: float, Je: float) -> float:

@@ -54,10 +54,16 @@ A_369_to_S12  = BR_P12_to_S12 * A_P12_total   # P1/2 -> S1/2
 A_2438_to_D32 = BR_P12_to_D32 * A_P12_total   # P1/2 -> D3/2
 A_D32_to_S12  = 1.0 / tau_D32                 # D3/2 -> S1/2 
 
-# Angular frequencies (Using formula: ω = 2πc/λ)
-omega_369  = 2 * np.pi * consts.c / (369.52604e-9)   # S1/2 <-> P1/2
-omega_2438 = 2 * np.pi * consts.c / (2.438e-6)      # D3/2 <-> P1/2
-omega_435  = 2 * np.pi * consts.c / (435.5e-9)      # S1/2 <-> D3/2 (E2; unused transition metadata)
+# NIST ASD v5.12 Yb II fine-structure levels, cm^-1; accessed 2026-11-16.
+# https://physics.nist.gov/asd ; DOI 10.18434/T4W30F.
+# Vacuum Ritz wavelengths: lambda(m)=1e-2/(E_upper-E_lower).
+NIST_LEVEL_ENERGIES_CM1 = {"S12": 0.00, "D32": 22960.80, "P12": 27061.82}
+WAVELENGTH_DP_M = 1e-2 / (NIST_LEVEL_ENERGIES_CM1["P12"] - NIST_LEVEL_ENERGIES_CM1["D32"])
+WAVELENGTH_SD_M = 1e-2 / (NIST_LEVEL_ENERGIES_CM1["D32"] - NIST_LEVEL_ENERGIES_CM1["S12"])
+# PRA 83, 013406 (2011), Table III: vacuum S(F=1)-P(F=0) wavelength.
+omega_369 = 2 * np.pi * consts.c / 369.52604e-9
+omega_2438 = 2 * np.pi * consts.c / WAVELENGTH_DP_M
+omega_435 = 2 * np.pi * consts.c / WAVELENGTH_SD_M  # unused E2 metadata
 
 # I for Yb-171 is always 1/2 
 I = 0.5

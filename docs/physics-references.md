@@ -20,16 +20,16 @@ this simulator does not propagate those uncertainties.
 | Input | Adopted value | Published source / interpretation |
 | --- | --- | --- |
 | S1/2–P1/2 wavelength | 369.52604 nm (vacuum) | McLoughlin et al., [PRA 83, 013406 (2011)](https://doi.org/10.1103/PhysRevA.83.013406), Table III: S1/2(F=1) ↔ P1/2(F=0) of 171Yb+, 369.52604(6) nm. The wavelength is a vacuum measurement; it is used for the reduced-element frequency, not as a completed hyperfine-resolved detuning map. |
-| D3/2–P1/2 wavelength | 2.438 µm | Project-adopted value requested in Phase 1b; McLoughlin et al., [PRA 83, 013406 (2011)](https://doi.org/10.1103/PhysRevA.83.013406), for the level scheme and optical spectroscopy context. This paper measures S–P and the 935 nm line, not a direct precision measurement of this DP line; the precise DP attribution remains to be established. |
-| S1/2–D3/2 wavelength | 435.5 nm | Rounded, unused E2 metadata; [PRA 83, 013406 (2011)](https://doi.org/10.1103/PhysRevA.83.013406) is the user-specified wavelength reference. A direct E2 wavelength source at the retained precision is still needed; no E1 element is computed from it. |
+| D3/2–P1/2 vacuum Ritz wavelength | 2438.41775948 nm (about 2.438 µm) | Derived from NIST ASD Yb II fine-structure levels: 27061.82 − 22960.80 = 4101.02 cm⁻¹; see the NIST derivation below. |
+| S1/2–D3/2 vacuum Ritz wavelength | 435.524894603 nm | Derived from NIST ASD D level 22960.80 cm⁻¹ above S; unused E2 metadata, not an E1 element. |
 | P1/2 lifetime | 8.12(2) ns; code uses central value | Olmschenk et al., [PRA 80, 022502 (2009)](https://doi.org/10.1103/PhysRevA.80.022502), _Measurement of the lifetime of the 6p 2P1/2 level of Yb+_. |
 | D3/2 lifetime | 52.7 ms; source uncertainty 2.4 ms | Yu and Maleki, [PRA 61, 022507 (2000)](https://doi.org/10.1103/PhysRevA.61.022507). Unused transition metadata; no D→S radiative collapse is implemented. |
 | 3D[3/2]1/2 lifetime | 37.7 ns | Berends et al., [J. Phys. B 26, L701 (1993)](https://doi.org/10.1088/0953-4075/26/20/003), _Beam-laser lifetime measurements for four resonance levels of Yb II_. Retained metadata; this level is absent from the evolved basis. |
 | P1/2→D3/2 branching fraction | 0.00501(15); code uses central value | Olmschenk et al., [PRA 76, 052314 (2007)](https://doi.org/10.1103/PhysRevA.76.052314), Fig. 1 and Appendix A. |
 | P1/2→S1/2 branching fraction | `1 - 0.00501` = 0.99499 | Complement of the preceding measurement in the retained two-branch approximation, not a separate measurement. |
-| S1/2 hyperfine value | 12.642812118466 GHz | [IEEE Trans. UFFC 44, 344 (1997)](https://doi.org/10.1109/58.585119), _Accurate measurement of the 12.6 GHz clock transition in trapped 171Yb+ ions_. Rounded legacy `nu_S12` metadata remains 12.64 GHz. |
-| P1/2 hyperfine value | 2.105 GHz | [PRA 49, 3351 (1994)](https://doi.org/10.1103/PhysRevA.49.3351), _Isotope shifts and hyperfine structure in the 369.4-nm resonance line of singly ionized ytterbium_. Rounded legacy `nu_P12` metadata remains 2.11 GHz. |
-| Stored D3/2 hyperfine value | 0.86375 GHz | Project-adopted Phase 1b value. [PRA 76, 052314 (2007)](https://doi.org/10.1103/PhysRevA.76.052314), Fig. 5, reports the **F-level splitting** as 0.86(2) GHz; it does not establish the requested extra digits or identify this number as A/h. See qualification below. |
+| S1/2 hyperfine value | 12.642812118466 GHz | [IEEE Trans. UFFC 44, 344 (1997)](https://doi.org/10.1109/58.585119), _Accurate measurement of the 12.6 GHz clock transition in trapped 171Yb+ ions_. Metadata uses the same S value. |
+| P1/2 hyperfine value | 2.105 GHz | [PRA 49, 3351 (1994)](https://doi.org/10.1103/PhysRevA.49.3351), _Isotope shifts and hyperfine structure in the 369.4-nm resonance line of singly ionized ytterbium_. Metadata uses the same P value. |
+| D3/2 splitting and A/h | splitting 0.86375 GHz; A/h = 0.431875 GHz | Adopted splitting, [PRA 76, 052314 (2007)](https://doi.org/10.1103/PhysRevA.76.052314), Fig. 5, which reports 0.86(2) GHz. A/h = splitting/2 for I=1/2,J=3/2; adopted digits exceed the source precision. |
 | 3D[3/2]1/2 hyperfine splitting | 2.2095 GHz | [PRA 76, 052314 (2007)](https://doi.org/10.1103/PhysRevA.76.052314), Fig. 5: 2.2095(11) GHz. Metadata only. |
 | Nuclear spin | I=1/2 | [PRA 76, 052314 (2007)](https://doi.org/10.1103/PhysRevA.76.052314), Sec. I. |
 | Manifolds | S1/2, P1/2, D3/2; auxiliary 3D[3/2]1/2 | [PRA 76, 052314 (2007)](https://doi.org/10.1103/PhysRevA.76.052314), Figs. 1 and 5. F,mF basis from angular-momentum addition with I=1/2 (Foot, Ch. 6). |
@@ -40,15 +40,27 @@ this simulator does not propagate those uncertainties.
 | Quadrupole hyperfine metadata B | Zero | I=1/2 has no nuclear electric quadrupole contribution (Foot, Ch. 6); the metadata is unused in evolution. |
 | SI constants | `scipy.constants` | SciPy's supplied physical constants; no manually substituted numerical values. |
 
-**Hyperfine qualification.** `HFS_A_GHZ['D']` and `LevelData.Ahfs` still
-name the requested D value as an A constant, while the cited measurement
-is a splitting. For I=1/2, J=3/2, the standard `E_F = A*K/2` expression gives
-`E(F=2)-E(F=1)=2*A`, with its sign set by the level ordering. Do not insert
-the stored value into diagonal energies without resolving the factor, sign,
-and source precision. Neither this nor the S/P hyperfine values currently
-enters the active diagonal energies. The auxiliary `D3212` object has corrected
-J=1/2 but retains legacy S,L fields; it is effective metadata, not a valid
-LS-coupled configuration for calculating additional couplings.
+**Hyperfine labeling.** `nu_D32` stores the F=1↔F=2 splitting;
+`HFS_A_GHZ['D']` and `LevelData.Ahfs/h` now store half that value, the
+magnetic-dipole A/h. S and P have J=1/2, so their A/h equals their splitting.
+Their metadata now uses the same S/P values as `HFS_A_GHZ`, rather than
+rounded duplicates. These constants still do not enter active diagonal
+energies. The auxiliary D3212 object is metadata only; its legacy S,L fields
+are not a valid LS configuration for building additional couplings.
+
+## NIST wavelength derivation
+
+Kramida, Ralchenko, Reader and NIST ASD Team (2024), _NIST Atomic Spectra
+Database_, version 5.12, [DOI 10.18434/T4W30F](https://doi.org/10.18434/T4W30F),
+accessed **2026-11-16**. [Official Yb II level query](https://physics.nist.gov/cgi-bin/ASD/energy1.pl?spectrum=Yb%20II&units=0&format=3&output=0&page_size=500&conf_out=on&term_out=on&level_out=on&j_out=on&biblio=on).
+The query returns S1/2 = 0.00, D3/2 = 22960.80, and P1/2 = 27061.82 cm⁻¹.
+For energies expressed as wavenumbers, `lambda_vac(nm)=1e7/(E_upper-E_lower)`.
+The code retains these input level energies and derives both wavelengths;
+extra displayed digits show arithmetic, not extra experimental precision.
+These are fine-structure Ritz values, not isotope/hyperfine-resolved
+171Yb+ lines. No hyperfine detuning or energy offsets were inferred from them.
+The separate 369.52604 nm input is the vacuum hyperfine-component measurement
+identified in the table above; its distinct provenance is intentional.
 
 **Neutral versus ion data.** arXiv:2509.04416 concerns **neutral Yb**.
 Its magnetic-moment convention and generic angular-momentum formulas are
@@ -64,7 +76,7 @@ P lifetime using `_rme_eq54`. This is the Racah-normalized lifetime relation
 in [arXiv:2509.04416, Eq. 54](https://arxiv.org/html/2509.04416v1#S5.SS3).
 It is a general E1 relation, not a neutral-atom numerical dipole input.
 The unused SD E1 estimate and its unsourced branching factor were removed;
-the 435.5 nm E2 line has no E1 reduced element in this model.
+the NIST-derived S–D E2 line has no E1 reduced element in this model.
 Einstein-A metadata uses `branch/tau` (SP/DP) and `1/tau_D` (SD). These are
 not automatically the Lindblad rates selected by the UI or demo.
 
