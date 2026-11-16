@@ -8,12 +8,17 @@ import numpy as np
 from qutip import basis, destroy, mesolve, qeye, tensor
 
 
-def simulate_demo() -> dict[str, np.ndarray]:
+def simulate_demo(*, fock_dimension: int = 2) -> dict[str, np.ndarray]:
+    """Run the illustrative pulse sequence; vary truncation for convergence checks.
+
+    ``fock_dimension`` is the number of Fock states per polarization mode.
+    The default remains two (vacuum and one photon).
+    """
     # Use the same pulse-enabled physics as the interactive application.
     from . import yb171_simulator as model
 
     dim = model.HF_BASIS_DIM
-    n = 2
+    n = fock_dimension
     identity = qeye(n)
     projectors = {
         level: tensor(identity, identity, model.projector_for_level_hf(level))
