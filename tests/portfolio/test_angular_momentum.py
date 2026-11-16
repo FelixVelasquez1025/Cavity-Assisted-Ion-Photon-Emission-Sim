@@ -44,3 +44,28 @@ def test_hyperfine_coefficients_match_signed_reference(
         key, mp-m, False, .5, J, Fp=Fp, F=F, mFp=mp, mF=m
     ) / model.REDUCED_E1_ELEMENTS[key]
     assert coefficient == pytest.approx(coefficient_expected)
+
+
+@pytest.mark.parametrize(
+    "level,F,reference_mhz_per_gauss",
+    [("S12", 1, 1.4), ("P12", 1, .47), ("D32", 1, 1.4), ("D32", 2, .84)],
+)
+def test_zeeman_matches_reference(level, F, reference_mhz_per_gauss):
+    # First-order per-mF weak-field values requested for the Yb+ model.
+    # Landé formula and Bohr-magneton convention: arXiv:2509.04416, Eqs. 16-23.
+    # That source treats neutral Yb; this test evaluates the formula for the
+    # ion's S/P/D quantum numbers, not its neutral-atom tabulated g_J values.
+    atom_level = getattr(model.Yb171, level)
+    _, g_f = model.lande_g_factors(
+        F, model.I_NUCLEAR, atom_level.J, atom_level.L, atom_level.S
+    )
+    coefficient = g_f * model.MU_B * 1e-4 / (2*np.pi*1e6)
+    assert coefficient == pytest.approx(reference_mhz_per_gauss, rel=.02)
+    if level != "P12":
+        builder = model.eq_2_4_5_H_S_hf if level == "S12" else model.eq_2_4_6_H_D_hf
+        h = builder(0.0, 1e-4)
+        i0 = model.hf_state_index(level[0], F, 0)
+        i1 = model.hf_state_index(level[0], F, 1)
+        shift = float(np.real(h[i1, i1]-h[i0, i0])) / (2*np.pi*1e6)
+        assert shift == pytest.approx(reference_mhz_per_gauss, rel=.02)
+    # P currently has no diagonal Zeeman term: only its g_F formula is checked.
