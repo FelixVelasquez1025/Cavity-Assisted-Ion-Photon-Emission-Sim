@@ -100,7 +100,7 @@ G_I = -0.0005362
 _EA0 = consts.e * consts.physical_constants["Bohr radius"][0]
 
 # Diagram-derived lifetimes, branching ratios, and angular frequencies
-TAU_P12 = 8.07e-9       # 6p 2P1/2
+TAU_P12 = 8.12e-9       # 6p 2P1/2
 TAU_D32 = 52.7e-3       # 5d 2D3/2
 BR_P12_TO_S12 = 0.995
 BR_P12_TO_D32 = 0.005

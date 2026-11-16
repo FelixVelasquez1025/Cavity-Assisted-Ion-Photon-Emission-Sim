@@ -36,7 +36,7 @@ class Transition:
 # Transition data 
 
 # Lifetimes of each level (Straight from diagram)
-tau_P12   = 8.07e-9       # 6p 2P1/2
+tau_P12   = 8.12e-9       # 6p 2P1/2
 tau_D32   = 52.7e-3       # 5d 2D3/2
 tau_D3212  = 37.7e-9      # 3D[3/2]1/2  
 
