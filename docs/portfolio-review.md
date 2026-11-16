@@ -73,9 +73,20 @@ pulse-resolved correlations, and useful-output flux/loss separation.
 
 ## Validation and GitHub handoff
 
-Local sync, active tests and demo are required after each step. Final
-fresh-clone verification and remote CI results will be recorded before
-handoff. No PR will be merged by this work.
+Local sync, tests and demo passed after every committed step. The README's
+five commands also passed in an isolated clone: locked install, **22 tests**,
+demo, figures and the dimension 2/3/4 comparison. The wheel and source
+distribution built successfully and were inspected to exclude `archive/`.
+Both generated figures were visually checked. The renamed UI initialized
+headlessly; desktop interaction was not exercised.
+
+Hygiene removed the pre-correction image, generated Hamiltonian matrices,
+old generated slide deck and stray editor-settings text. Generated NPZ,
+`outputs/`, macOS metadata and the optional UI cache are ignored. No tracked
+personal absolute paths, source PDFs or level diagrams remain. The Step 1
+audit file is removed as requested; its six answers are transferred to the
+PR description, alongside final remote fresh-clone and CI evidence.
+No PR is merged by this work.
 
 Merge the reviewed PR into `main`, then confirm `main` as GitHub's default
 branch. Suggested description: “Open-system Yb-171 ion–cavity simulation

@@ -5,7 +5,7 @@ Photons from a Trapped-Ion Cavity-QED System_, PhD thesis, University of
 Sussex, June 2020**, supplies the calcium ion-cavity model. The earlier
 attribution to a different thesis was incorrect. The user's supplied Walker
 PDF is a reference, not a repository asset; no source PDF or level diagram
-is distributed here. The dated [audit](AUDIT.md) is a pre-correction snapshot;
+is distributed here. The dated [review report](portfolio-review.md) is a pre-correction snapshot;
 [Phase 1b results](phase1b-physics-review.md) describe subsequent changes.
 
 ## Atomic inputs

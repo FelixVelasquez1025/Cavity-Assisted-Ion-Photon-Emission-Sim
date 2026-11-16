@@ -1,6 +1,9 @@
 # Phase 1b physics corrections and checks
 
-The pre-correction [Step 1 audit](AUDIT.md) remains the baseline. This work
+Historical checkpoint: current values, paths and review status are superseded
+by [Phase 1c and the final review](portfolio-review.md).
+
+The pre-correction Step 1 audit (answers transferred to the final PR) remains the baseline. This work
 continues on `portfolio-cleanup` and stops before Steps 2–7. No source PDFs,
 level-diagram images, internal reference documents, or generated demo arrays
 were committed. Atomic inputs and source qualifications are catalogued in
