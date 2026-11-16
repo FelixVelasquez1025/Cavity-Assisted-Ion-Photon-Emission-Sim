@@ -1,8 +1,9 @@
 # Model status
 
 The portfolio application uses `src/caipe_sim/yb171_simulator.py`, preserved
-from the latest pulse-enabled Yb-171 example. Packaging changes do not retune
-the existing Hamiltonian or decay conventions. This is an exploratory model;
+from the latest pulse-enabled Yb-171 example. Phase 1b corrected atomic inputs and the
+signed hyperfine phase; its [results report](phase1b-physics-review.md)
+records the numerical effects. Amplitude and decay conventions were preserved. This is an exploratory model;
 the current tests establish numerical invariants and an analytic pulse limit,
 not a completed photon-generation performance study. Atomic inputs were corrected in Phase 1b and are now individually sourced;
 the source-precision and metadata qualifications are explicit in the reference guide.
@@ -31,11 +32,63 @@ Neither the aliases nor the name “reset” imply a physical 935 nm simulation.
   in the interactive application.
 
 UI frequency inputs are labeled MHz and time inputs are microseconds. The
-solver uses seconds and angular frequencies. The existing `rabi_frequencies`
-helper halves the input amplitude, and the transition builders apply another
-one-half factor and a reduced matrix element. Treat the amplitude sliders as
-model inputs under the existing convention, and document the relationship to
-the separately verified transition-specific Rabi frequencies.
+solver uses seconds and angular frequencies. Parameter choices in the UI
+and demo are illustrative, not a fit to experimental data. The active tests
+check constructed-model invariants and limiting cases, not a completed
+calibration or photon-generation performance study.
+
+## Known limitations
+
+- **No diagonal hyperfine splittings.** The F,mF states and angular weights
+  are present, but `HFS_A_GHZ` and metadata `Ahfs` do not enter the active
+  diagonal energies. The stored D value also needs an A-versus-splitting,
+  sign, and source-precision decision before it can be used there.
+- **No P1/2 Zeeman Hamiltonian.** Only S and D receive linear `g_F*mF*B`
+  terms. The P g_F formula is now tested, but its energy shifts are not
+  applied. No field-induced hyperfine mixing or quadratic Zeeman term is
+  implemented. See the proposed work below; no P term was added in Phase 1b.
+- **One cavity polarization couples per run.** The left/right selection adds
+  only its corresponding interaction; pi adds none. Both Fock spaces share
+  one detuning and coupling input, with no polarization splitting.
+- **The cavity line is D3/2–P1/2 at 2.438 µm, not S–P at 369 nm.** The
+  simplified reset coupling acts on this same DP transition. It does not
+  reproduce the dynamics or branching of the physical 935 nm pathway.
+- **Decay-rate inputs are not normalized physical rates.** The collapse
+  amplitudes contain full E1 matrix-element weights, including reduced
+  dipoles. The supplied `gamma_SP`/`gamma_DP` are independent illustrative
+  scales, not measured total branch rates. Metadata lifetimes and branching
+  fractions do not automatically normalize the channel sums. `gamma_SD`
+  controls S/D projector dephasing, not a radiative D→S decay channel.
+- **Truncation sensitivity is measurable.** The default demo has two Fock
+  states per mode. Increasing this to three changes a manifold population
+  by as much as 0.00863983443916 for the current pulse sequence; see the
+  [executed comparison](fock-convergence.md). This is not a convergence proof.
+- **Current correlations are fluorescence diagnostics.** They use an SP
+  atomic transition operator and the final state with a static Hamiltonian,
+  not pulse-resolved cavity-output correlations. Intracavity photon number
+  is not itself an output probability. No polarization-entanglement claim
+  is established by the present calculations.
+- **UI configuration discrepancy.** `params['system']` starts as pi, but the
+  radio selector starts at left and determines the actual initial solve.
+  Zero default cavity coupling still disables cavity exchange. This existing
+  discrepancy is reported, not changed in Phase 1b.
+
+## What adding P1/2 Zeeman shifts would involve (not implemented)
+
+Add a P-manifold diagonal builder using the existing `lande_g_factors` and
+`MU_B=mu_B/hbar`, with terms `g_F(P)*MU_B*B_T*mF` for each P basis state.
+F=0 has zero first-order shift. Include that operator in the tensor-lifted
+static Hamiltonian alongside S and D in **both** the demo and UI; currently
+`add_bare_terms_to_systems` accepts only the S and D operators. Define the
+common rotating-frame reference and hyperfine detunings first: a common
+energy offset is removable, but distinct P sublevel shifts are not.
+
+Verify the weak-field slope, opposite mF symmetry, F=0 and zero-field
+limits, Hermiticity, and detuned Rabi transition frequencies. The existing
+`test_zeeman_matches_reference` checks the P g_F calculation only, not an
+implemented P term. The expected coefficient and its source are recorded
+in the [Phase 1b report](phase1b-physics-review.md). This change would alter
+finite-field dynamics and requires a separate reviewed physics commit.
 
 ## Exact amplitude convention (behavior preserved)
 
@@ -66,45 +119,34 @@ Only the contradictory docstrings have changed; no amplitude factors were
 removed. The older `hamiltonian_utils.py` uses a different convention and
 must not be treated as the same solver.
 
-## Remaining model and analysis work
+## Next steps (outside Phase 1b)
 
-1. **Rotating-frame mapping.** Walker's thesis (Eq. 2.3.7) references the excited P state and
-   expresses the Hamiltonian in detunings, so absolute optical energies need
-   not appear. Document which Yb hyperfine transitions define those detunings
-   and how relative offsets are handled. The active code builds S and D Zeeman
-   terms but no P term; adding a P term is a separate model correction. This concerns using the
-   verified constants in the Hamiltonian, not recalculating the constants.
-2. **Both cavity polarizations.** The thesis uses `H_a + H_b` (Eqs. 2.4.14–2.4.15). The
-   current selected branch includes one cavity coupling; pi includes none.
-   Establish whether the intended protocol deliberately restricts the modes
-   or should evolve both simultaneously.
-3. **Output efficiency.** In the thesis convention, useful output flux is
-   `2 * kappa_out * <n(t)>`. Separate useful transmission from other cavity
-   losses, integrate the flux, and distinguish mean emitted photon count from
-   the probability of exactly one photon. The older steady-state efficiency
-   proxy is not this measurement.
-4. **Pulse-resolved correlations.** The UI evaluates correlations using the
-   atomic SP fluorescence operator, a static Hamiltonian, and a final state.
-   Implement the intended time-dependent cavity-output correlations before
-   interpreting these plots as single-photon performance.
-5. **Cavity convergence and studies.** Compare larger photon truncations and
-   integration settings, then quantify pulse speed, emission, and coherence
-   over a parameter grid. The small demo is a numerical illustration.
+1. Map the rotating-frame detunings to specific Yb hyperfine transitions;
+   resolve the stored D metadata before adding splittings or P Zeeman terms.
+2. Decide and implement simultaneous two-polarization coupling if required
+   by the protocol. Walker adds `H_a + H_b` in Eqs. 2.4.14–2.4.15.
+3. Separate useful output transmission from other losses; evaluate
+   `2*kappa_out*<n(t)>` and its integral. Distinguish mean emitted count
+   from exactly-one-photon probability. Walker: Eqs. 2.6.3–2.6.5.
+4. Implement pulse-resolved cavity-field correlations before interpreting
+   single-photon purity or indistinguishability.
+5. Check larger Fock truncations and tighter integration settings over the
+   intended parameter range, then study pulse speed, emission, and coherence.
+6. Establish normalized physical decay rates and an explicit experimental
+   reset pathway if that is needed for calibration.
 
-The `sqrt(2 * gamma)` and `sqrt(2 * kappa)` collapse amplitudes match Walker's
-thesis, Eqs. 2.2.6–2.2.7 and 2.4.16–2.4.19. That factor of two is intentional. Record the rate and
-angular-weight conventions alongside the verified Yb inputs so that older
-and newer model results can be compared consistently.
+The `sqrt(2*gamma)` and `sqrt(2*kappa)` factors follow Walker's collapse
+convention (Eqs. 2.2.6–2.2.7 and 2.4.16–2.4.19); they have not been removed.
+Full source definitions are in [physics-references.md](physics-references.md).
 
 ## Software boundaries
 
-`hamiltonian_utils.py`, `interactive_ui.py`, and `batch_runner.py` contain an
-older parallel implementation. They remain for comparison and are not the
-portfolio CLI's physics backend. Bring batch sweeps onto the pulse-enabled
-backend before treating them as equivalent results. JAX is optional for those
-older experiments; the portfolio application and demo currently use CPU QuTiP.
-
-The active validation suite is `tests/portfolio/`. Historical tests under
-`tests/tests/` and `caipe_sim/` target obsolete APIs and are retained as project
-history; they are explicitly outside the default pytest collection. Reconcile
-or archive them before a final public release.
+`hamiltonian_utils.py`, `interactive_ui.py`, and the batch modules are older
+parallel implementations, not the active CLI backend. Their duplicate
+wavelength, lifetime, branching, and phase entries were corrected where
+requested, but this does not make their Hamiltonian or amplitude conventions
+equivalent. Batch sweeps still need to move to the pulse-enabled backend.
+JAX is optional for historical experiments; the active application uses CPU
+QuTiP. Default test collection is `tests/portfolio/`; historical tests under
+`tests/tests/` and `caipe_sim/` are excluded. Archival and the README landing
+page rewrite remain Steps 2–7, pending the user's go-ahead.

@@ -99,3 +99,13 @@ preserved development versions; the portfolio CLI uses `yb171_simulator.py`.
 Their results should not be assumed equivalent without reconciliation.
 
 .
+
+## Next steps
+
+- Add simultaneous coupling to both cavity polarizations for the intended protocol.
+- Implement pulse-resolved cavity-output correlations.
+- Separate useful output flux from other cavity losses.
+
+These are outside Phase 1b. See [model status](docs/model-status.md) for the
+missing diagonal hyperfine and P Zeeman terms, unnormalized decay-rate inputs,
+and [Fock truncation sensitivity](docs/fock-convergence.md).
