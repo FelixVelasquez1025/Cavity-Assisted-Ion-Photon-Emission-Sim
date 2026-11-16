@@ -4,7 +4,7 @@ Open-system simulation of a driven Yb-171 ion with two optical cavity polarizati
 
 ![Resonant Gaussian Rabi pulse: simulation, analytic solution and residual](docs/figures/rabi_validation.png)
 
-Simulation against the analytic Gaussian pulse-area solution, using the same setup as the [Rabi test](tests/portfolio/test_yb171.py); residuals are shown below the population. [Illustrative demo dynamics](docs/figures/demo_dynamics.png).
+Simulation against the analytic Gaussian pulse-area solution, using the same setup as the [Rabi test](tests/portfolio/test_yb171.py); residuals are shown below the population. [Illustrative demo dynamics](docs/figures/demo_dynamics.png), with 4 Fock states per mode (maximum 4−5 population difference 2.413e-4; photon-number difference 7.532e-5).
 
 ## What it models
 
@@ -28,7 +28,7 @@ The demonstration uses these inputs. Amplitudes and decay settings are model sca
 | γ_SP/(2π), γ_DP/(2π); S/D dephasing input | 0.01, 0.01; 0.000136 | MHz | Illustrative; [demo] |
 | Initial state; coupled mode | S,F=0,mF=0; left | — | Illustrative; [demo] |
 | Time window; samples | 0–2; 201 | µs; count | [demo] |
-| Fock dimension per mode | 2 | count | [Truncation decision](docs/fock-convergence.md) |
+| Fock dimension per mode | 4 | count | [Truncation decision](docs/fock-convergence.md) |
 | S–P vacuum wavelength | 369.52604 | nm | PRA 83, 013406, Table III; [sources] |
 | D–P vacuum Ritz wavelength | 2438.417759 | nm | NIST ASD level difference; [sources] |
 | P1/2 lifetime; P→D branching | 8.12; 0.00501 | ns; fraction | PRA 80, 022502; PRA 76, 052314; [sources] |
@@ -45,7 +45,7 @@ The UI starts in the same atomic state, left polarization, coupling and cavity l
 - Analytic resonant Rabi evolution.
 - Signed hyperfine coefficients against evaluated Wigner 3j/6j reference values.
 - Zeeman slopes against published formulas and rounded reference values.
-- Fock truncation at dimensions 2, 3 and 4: **3 versus 4 exceeds 1e-3**, so the default stays 2; this does not establish convergence.
+- Fock truncation at dimensions 2, 3, 4 and 5: every **4 versus 5 difference is below 1e-3**, so the default is 4 for this demo sequence.
 
 ## Quickstart
 

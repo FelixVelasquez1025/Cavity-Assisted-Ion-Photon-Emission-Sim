@@ -23,14 +23,20 @@ checkpoint; the following changes supersede its unresolved items.
 - All atomic provenance and precision limitations are in the source guide;
   these calculations add no new calibrated experimental parameter.
 
-The extended [Fock check](fock-convergence.md) compares dimensions 2, 3 and
-4. On the final wavelength inputs, max abs(3−4) is 0.00223388488984 for
-manifold populations and 0.00147452473536 for photon number. The requested
-1e-3 condition fails; default dimension **2 is retained**. Both README
-figures and the analytic test use that same numerical default. The maximum
-Rabi residual from the figure script is 1.99684274e-5, below the existing
-2e-5 absolute comparison tolerance. Source: executed comparison/figure
-scripts and `run_rabi_validation`; no experimental accuracy is implied.
+The extended [Fock check](fock-convergence.md) now compares dimensions 2, 3,
+4 and 5. The 3−4 comparison failed, but every 4−5 difference passes 1e-3:
+maximum population difference 0.000241316721655 and photon-number difference
+0.0000753242015548. The demo/UI default is therefore **4**, shared by both
+README figures and the analytic test. This is a sequence-specific check.
+
+The pre-merge analytic solver check at dimension 2 reduced the maximum
+residual from 1.99684274e-5 to 1.64187332e-7 (about 122×) with atol=1e-10,
+rtol=1e-8. At the new default dimension 4 the residual is 3.40955548e-7;
+the test/figure comparison uses absolute tolerance 3.5e-6 and rtol=0
+(about 10× that residual). Only the analytic experiment uses tighter solver
+tolerances; the demo/truncation solver remains unchanged. Source: executed
+comparison/figure scripts and `run_rabi_validation`; no experimental
+accuracy is implied.
 
 ## Repository changes
 

@@ -62,18 +62,18 @@ calibration or photon-generation performance study.
   scales, not measured total branch rates. Metadata lifetimes and branching
   fractions do not automatically normalize the channel sums. `gamma_SD`
   controls S/D projector dephasing, not a radiative D→S decay channel.
-- **Truncation sensitivity is measurable.** The default demo has two Fock
-  states per mode. Increasing this to three changes a manifold population
-  by as much as 0.00864233158656 for the current pulse sequence; see the
-  [executed comparison](fock-convergence.md). This is not a convergence proof.
+- **Truncation is sequence-dependent.** The default is four Fock states per
+  mode: maximum 4−5 population difference is 2.413e-4 and photon-number
+  difference is 7.532e-5 for the demo; see the
+  [executed comparison](fock-convergence.md). This does not validate other pulses.
 - **Current correlations are fluorescence diagnostics.** They use an SP
   atomic transition operator and the final state with a static Hamiltonian,
   not pulse-resolved cavity-output correlations. Intracavity photon number
   is not itself an output probability. No polarization-entanglement claim
   is established by the present calculations.
-- **Truncation decision:** dimension 3 versus 4 exceeds 1e-3 in both a
-  population and photon number, so the default remains 2. Figures and the
-  analytic validation helper share `DEFAULT_FOCK_DIMENSION`.
+- **Truncation decision:** every dimension 4 versus 5 difference is below
+  1e-3, so the default is 4. Figures and the analytic validation helper share
+  `DEFAULT_FOCK_DIMENSION`.
 
 The UI dictionary and radio selector now both start at left, with cavity
 coupling 0.5 MHz and loss input 0.1 MHz, matching the demo. The UI retains

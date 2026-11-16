@@ -21,7 +21,7 @@ def make_figures(output: Path) -> None:
     with plt.rc_context({"font.size": 12, "axes.spines.top": False,
                          "axes.spines.right": False, "lines.linewidth": 2}):
         data = run_rabi_validation()
-        np.testing.assert_allclose(data["simulated"], data["analytic"], atol=2e-6, rtol=0)
+        np.testing.assert_allclose(data["simulated"], data["analytic"], atol=3.5e-6, rtol=0)
         fig, axes = plt.subplots(2, 1, figsize=(8, 6), sharex=True,
                                  gridspec_kw={"height_ratios": [3, 1]}, layout="constrained")
         axes[0].plot(data["time_us"], data["analytic"], color="#173f5f", label="Analytic pulse-area solution")
