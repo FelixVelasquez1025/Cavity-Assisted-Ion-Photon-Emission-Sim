@@ -1,4 +1,8 @@
-"""Small headless run of the full hyperfine basis with two cavity modes."""
+"""Headless Yb model with a simplified D3/2→P1/2 reset coupling.
+
+This is a stand-in for the 935 nm repump via 3D[3/2]1/2; that intermediate
+level and its dynamics are not included. The modeled DP line is 2.438 µm.
+"""
 
 from __future__ import annotations
 
@@ -41,28 +45,31 @@ def simulate_demo(*, fock_dimension: int = 2) -> dict[str, np.ndarray]:
     h_d = model.eq_2_4_6_H_D_hf(0.0, 0.0)
     h_static = model.add_bare_terms_to_systems(cavity, h_s, h_d, 0.0, 0.0, n, n)["left"]
     h_drive = tensor(identity, identity, model._build_systems_hf("SP", 1.0, dim)["left"])
-    h_repump = tensor(identity, identity, model._build_systems_hf("DP", 1.0, dim)["left"])
+    h_reset = tensor(identity, identity, model._build_systems_hf("DP", 1.0, dim)["left"])
     drive_amp, rep_amp = model.rabi_frequencies(2 * np.pi * 5e6, 2 * np.pi * 3e6)
     pulse_args = dict(
         drive_amp=drive_amp, drive_t0=0.6e-6, drive_sigma=0.2e-6,
-        rep_amp=rep_amp, rep_t0=1.1e-6, rep_sigma=0.25e-6,
+        reset_amp=rep_amp, reset_t0=1.1e-6, reset_sigma=0.25e-6,
     )
     times = np.linspace(0.0, 2e-6, 201)
     psi0 = tensor(basis(n, 0), basis(n, 0), basis(dim, model.hf_state_index("S", 0.0, 0.0)))
     result = mesolve(
-        [h_static, [h_drive, model.omega_drive], [h_repump, model.omega_rep]],
+        [h_static, [h_drive, model.omega_drive], [h_reset, model.omega_reset]],
         psi0, times, c_ops=c_ops,
         e_ops=[*projectors.values(), *(op.dag() * op for op in cavity_ops)],
         args=pulse_args, options=model.solver_options(),
     )
-    return dict(
+    data = dict(
         time_us=times * 1e6,
         P_S=np.asarray(result.expect[0]), P_P=np.asarray(result.expect[1]),
         P_D=np.asarray(result.expect[2]),
         N_left=np.asarray(result.expect[3]), N_right=np.asarray(result.expect[4]),
         drive_MHz=np.asarray([model.omega_drive(t, **pulse_args) for t in times]) / (2 * np.pi * 1e6),
-        repump_MHz=np.asarray([model.omega_rep(t, **pulse_args) for t in times]) / (2 * np.pi * 1e6),
+        reset_MHz=np.asarray([model.omega_reset(t, **pulse_args) for t in times]) / (2 * np.pi * 1e6),
     )
+    # Compatibility alias for previously exported NPZ consumers.
+    data["repump_MHz"] = data["reset_MHz"]
+    return data
 
 
 def export_demo(output: Path) -> None:
@@ -79,7 +86,7 @@ def export_demo(output: Path) -> None:
         for key, label in [("P_S", "S manifold"), ("P_P", "P manifold"), ("P_D", "D manifold")]:
             axes[0].plot(data["time_us"], data[key], label=label)
         axes[0].set(ylabel="Population", ylim=(-0.02, 1.02), title="Yb-171: Gaussian pulses and cavity coupling")
-        for key, label in [("drive_MHz", "Drive envelope"), ("repump_MHz", "Repump envelope")]:
+        for key, label in [("drive_MHz", "Drive envelope"), ("reset_MHz", "D→P reset (2.438 µm)")]:
             axes[1].plot(data["time_us"], data[key], label=label)
         axes[1].set_ylabel("Envelope / 2π (MHz)")
         axes[2].plot(data["time_us"], data["N_left"], label="Left cavity mode")

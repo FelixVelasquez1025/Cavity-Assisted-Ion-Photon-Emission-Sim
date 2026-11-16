@@ -1,9 +1,14 @@
 # CAIPE-sim — Yb-171 ion-cavity dynamics
 
 An exploratory simulator for driven Yb-171 ions, combining a 16-state hyperfine
-basis, polarization-resolved couplings, Gaussian drive and repump pulses, and
+basis, polarization-resolved couplings, Gaussian drive and simplified reset pulses, and
 two cavity modes. QuTiP solves the dissipative dynamics; Matplotlib provides
 interactive controls and exported figures.
+
+The cavity is on the **2.438 µm D3/2–P1/2 line**, not the 369 nm S–P line.
+The D3/2→P1/2 reset coupling is a simplified stand-in for the 935 nm repump
+via 3D[3/2]1/2; the intermediate-level dynamics are not modeled.
+See [atomic sources](docs/physics-references.md).
 
 This project began as a collaborative three-level cavity-assisted ion-photon
 entanglement simulation and developed into the Yb-171 model. The portfolio focus
@@ -37,7 +42,7 @@ backend:
 uv run caipe-sim
 ```
 
-The UI exposes drive/repump amplitudes, centers and widths, detunings, magnetic
+The UI exposes drive/reset amplitudes, centers and widths, detunings, magnetic
 field, polarization, decay, and cavity parameters. Its default run starts in
 `S, F=0, mF=0`. Its three displayed atomic populations are selected state groups,
 not a complete partition of all 16 states; the exported demo uses full S/P/D

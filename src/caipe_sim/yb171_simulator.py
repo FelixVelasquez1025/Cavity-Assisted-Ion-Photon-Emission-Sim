@@ -554,16 +554,23 @@ def omega_drive(t: float, **args: float) -> float:
   return amp * math.exp(-0.5 * ((t - t0) / sigma) ** 2)
 
 
-def omega_rep(t: float, **args: float) -> float:
-  """Gaussian repump envelope Ω_rep(t)."""
-  amp = float(args.get("rep_amp", 0.0))
-  t0 = float(args.get("rep_t0", 0.0))
-  sigma = float(args.get("rep_sigma", 0.0))
+def omega_reset(t: float, **args: float) -> float:
+  """D3/2→P1/2 reset coupling (simplified stand-in for the 935 nm repump
+  via 3D[3/2]1/2), with a Gaussian envelope on the 2.438 micrometre line.
+
+  reset_* arguments are canonical; rep_* names are compatibility aliases.
+  This direct coherent DP coupling does not simulate the intermediate level.
+  """
+  amp = float(args.get("reset_amp", args.get("rep_amp", 0.0)))
+  t0 = float(args.get("reset_t0", args.get("rep_t0", 0.0)))
+  sigma = float(args.get("reset_sigma", args.get("rep_sigma", 0.0)))
   if sigma <= 0.0:
     return 0.0
   return amp * math.exp(-0.5 * ((t - t0) / sigma) ** 2)
 
 
+# Compatibility alias for saved pulse configurations and existing callers.
+omega_rep = omega_reset
 
 
 # This function builds H_SP and H_DP Hamiltonians for each polarization system
@@ -1142,9 +1149,12 @@ def interactive_populations():
   """Interactive UI: sliders for Δ_c, Δ_rep, Δ_driv (MHz) and B (G),
   plus a radio selector for polarization system (left, pi, right).
 
-  Uses atomic-only interaction + bare ion H0. Δ_c slider is included for
-  completeness but does not affect the atomic-only Hamiltonian.
+  The selected left/right branch includes one DP cavity coupling; pi does
+  not. The DP pulse is the simplified reset coupling described by omega_reset.
   """
+  # rep_* configuration/cache keys are retained as compatibility aliases.
+  # D3/2→P1/2 reset coupling (simplified stand-in for the 935 nm repump
+  # via 3D[3/2]1/2); it is not an intermediate-level repump simulation.
   # Default parameters
   params = dict(
     B_G=1.0,
@@ -1165,9 +1175,9 @@ def interactive_populations():
     is_bosonic=False,  # start in hyperfine mode
     use_cache=False,
     g_cav_MHz=0.0,  # disable cavity for clarity
-    # Moderate drive/repump that can be resolved with the chosen density
+    # Moderate drive/reset coupling that can be resolved with the chosen density
     amp_driv_MHz=5.0, # driving laser amplitude E0 (MHz)
-    amp_rep_MHz=3.0,  # repump laser amplitude E0 (MHz)
+    amp_rep_MHz=3.0,  # simplified DP reset amplitude input (MHz)
     drive_t0_us=5.0,
     drive_sigma_us=1.0,
     rep_t0_us=5.0,
@@ -1316,11 +1326,11 @@ def interactive_populations():
       "drive_amp": float(Omega_driv),
       "drive_t0": float(params.get("drive_t0_us", 0.0)) * 1e-6,
       "drive_sigma": float(params.get("drive_sigma_us", 0.0)) * 1e-6,
-      "rep_amp": float(Omega_rep),
-      "rep_t0": float(params.get("rep_t0_us", 0.0)) * 1e-6,
-      "rep_sigma": float(params.get("rep_sigma_us", 0.0)) * 1e-6,
+      "reset_amp": float(Omega_rep),
+      "reset_t0": float(params.get("rep_t0_us", 0.0)) * 1e-6,
+      "reset_sigma": float(params.get("rep_sigma_us", 0.0)) * 1e-6,
     }
-    H_td = [H, [H_sp_lift[pol], omega_drive], [H_dp_lift[pol], omega_rep]]
+    H_td = [H, [H_sp_lift[pol], omega_drive], [H_dp_lift[pol], omega_reset]]
     res = mesolve(
       H_td,
       psi0,
@@ -1377,6 +1387,12 @@ def interactive_populations():
   # Reserve extra bottom margin for added cavity controls
   plt.subplots_adjust(left=0.10, right=0.95, bottom=0.60)
 
+  fig.text(
+    0.5, 0.995,
+    "D3/2→P1/2 reset coupling\n"
+    "(simplified stand-in for the 935 nm repump via 3D[3/2]1/2)",
+    ha='center', va='top', fontsize=9,
+  )
   # Controls
   axcolor = 'lightgoldenrodyellow'
   row_h, gap = 0.035, 0.007
@@ -1410,13 +1426,13 @@ def interactive_populations():
   s_BG  = Slider(ax_BG,  'B (G)',    0.0, 50.0, valinit=params['B_G'])
   s_tmax = Slider(ax_tmax, 't_max (us)', 5.0, 200.0, valinit=params['tmax_us'])
   s_ddrv = Slider(ax_ddrv, 'Δ_driv (MHz)', -3.0, 3.0, valinit=params['delta_drive_MHz'])
-  s_drep = Slider(ax_drep, 'Δ_rep (MHz)', -3.0, 3.0, valinit=params['delta_rep_MHz'])
+  s_drep = Slider(ax_drep, 'Δ_reset (MHz)', -3.0, 3.0, valinit=params['delta_rep_MHz'])
   s_dcav = Slider(ax_dcav, 'Δ_c (MHz)',  -3.0, 3.0, valinit=params['delta_c_MHz'])
 
   s_dense= Slider(ax_dense,'samples/us', 1.0, 100.0, valinit=params['density'])
   s_gcav = Slider(ax_gcav, 'g_cav (MHz)', 0.0, 50.0, valinit=params.get('g_cav_MHz', 0.0))
   s_ampdrv = Slider(ax_ampdrv, 'Ω_drive (MHz)', -30.0, 30.0, valinit=params['amp_driv_MHz'])
-  s_amprep = Slider(ax_amprep, 'Ω_rep (MHz)', -30.0, 30.0, valinit=params['amp_rep_MHz'])
+  s_amprep = Slider(ax_amprep, 'Reset A (MHz)', -30.0, 30.0, valinit=params['amp_rep_MHz'])
   s_taumax = Slider(ax_taumax, 'τ_max (us)', 0.05, 10.0, valinit=params['tau_max_us'])
   s_gamma_sp = Slider(ax_gammasp, 'γ_SP', 0.0, 1.0, valinit=params['gamma_SP'])
   s_gamma_dp = Slider(ax_gammadp, 'γ_DP', 0.0, 1.0, valinit=params['gamma_DP'])
@@ -1424,8 +1440,8 @@ def interactive_populations():
   s_kappa = Slider(ax_kappa, 'κ (MHz)', 0.0, 1.0, valinit=params['kappa_MHz'])
   s_drive_t0 = Slider(ax_drive_t0, 'drive t0 (us)', 0.0, params['tmax_us'], valinit=params['drive_t0_us'])
   s_drive_sigma = Slider(ax_drive_sigma, 'drive σ (us)', 0.05, params['tmax_us'], valinit=params['drive_sigma_us'])
-  s_rep_t0 = Slider(ax_rep_t0, 'rep t0 (us)', 0.0, params['tmax_us'], valinit=params['rep_t0_us'])
-  s_rep_sigma = Slider(ax_rep_sigma, 'rep σ (us)', 0.05, params['tmax_us'], valinit=params['rep_sigma_us'])
+  s_rep_t0 = Slider(ax_rep_t0, 'reset t0 (us)', 0.0, params['tmax_us'], valinit=params['rep_t0_us'])
+  s_rep_sigma = Slider(ax_rep_sigma, 'reset σ (us)', 0.05, params['tmax_us'], valinit=params['rep_sigma_us'])
 
   ax_sys = plt.axes([0.82, 0.08, 0.15, 0.12], facecolor=axcolor)
   rb_sys = RadioButtons(ax_sys, ('left', 'pi', 'right'), active=0)

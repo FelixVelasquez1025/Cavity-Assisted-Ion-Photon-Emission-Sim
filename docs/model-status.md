@@ -11,11 +11,21 @@ Foot's *Atomic Physics* (2005) is the primary physics reference; Ward provides
 the specialized cavity model. The [reference guide](physics-references.md)
 records the relevant sections and translates their conventions.
 
+The DP pulse is the **D3/2→P1/2 reset coupling (simplified stand-in for the
+935 nm repump via 3D[3/2]1/2)**. It directly couples the existing D and P
+manifolds on the 2.438 µm line; the intermediate state is metadata only.
+`omega_reset` accepts `reset_amp`, `reset_t0`, and `reset_sigma`.
+`omega_rep` and `rep_*` pulse arguments remain compatibility aliases;
+legacy UI/cache parameter keys (`amp_rep_MHz`, `delta_rep_MHz`,
+`rep_t0_us`, `rep_sigma_us`) retain their serialized names. The demo exports
+`reset_MHz`, with `repump_MHz` as a compatibility alias for older NPZ readers.
+Neither the aliases nor the name “reset” imply a physical 935 nm simulation.
+
 ## Implemented behavior
 
 - A 16-state `(level, F, mF)` basis: four S states, four P states, eight D states.
 - Polarization-resolved E1 coefficients constructed with Wigner 3j/6j factors.
-- Separate Gaussian drive and repump envelopes with amplitude, center, and width.
+- Separate Gaussian drive and simplified DP reset envelopes with amplitude, center, and width.
 - Two truncated cavity modes, atomic decay, cavity leakage, and manifold dephasing.
 - Population and cavity photon observables; optional fluorescence correlations
   in the interactive application.

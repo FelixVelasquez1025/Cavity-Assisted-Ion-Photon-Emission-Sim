@@ -92,3 +92,13 @@ def test_zero_drive_preserves_ground_state():
     h = model.eq_2_4_5_H_S_hf(0.0, 1e-4) + model.eq_2_4_6_H_D_hf(0.0, 1e-4)
     result = mesolve(h, ground, np.linspace(0, 1e-6, 20), e_ops=[ground.proj()])
     np.testing.assert_allclose(result.expect[0], 1.0, atol=1e-12)
+
+
+def test_reset_coupling_preserves_legacy_pulse_arguments():
+    times = np.linspace(0, 2e-6, 201)
+    canonical = dict(reset_amp=3.0, reset_t0=1.1e-6, reset_sigma=.25e-6)
+    legacy = dict(rep_amp=3.0, rep_t0=1.1e-6, rep_sigma=.25e-6)
+    np.testing.assert_array_equal(
+        [model.omega_reset(t, **canonical) for t in times],
+        [model.omega_rep(t, **legacy) for t in times],
+    )

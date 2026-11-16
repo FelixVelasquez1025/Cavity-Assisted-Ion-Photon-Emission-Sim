@@ -26,7 +26,7 @@ they are not evidence that the original research analyses were completed.
 | --- | --- | --- |
 | 1: Lambda atom and cavity | Implemented: `three_level_model.py` evolves atom/cavity populations with loss; later examples add driven Rabi dynamics. | Establish an end-to-end emitted-photon benchmark, including losses and per-attempt counting. |
 | 2: Cooperativity and rate sweeps | Partial: steady-state g/kappa/gamma sweeps and plots exist in the week-02 report. | Replace the old efficiency proxy with output observables for the chosen generation protocol. |
-| 3: Temporal dynamics and pulse shaping | Partial: independent Gaussian drive/repump controls, atomic traces, and cavity photon traces exist. | Export emitted wavepacket intensity, duration, and integrated emission; compare speed/efficiency systematically. |
+| 3: Temporal dynamics and pulse shaping | Partial: independent Gaussian drive/reset controls, atomic traces, and cavity photon traces exist. | Export emitted wavepacket intensity, duration, and integrated emission; compare speed/efficiency systematically. |
 | 4: Realistic structure, branching, purity | Substantial implementation: 16-state F,mF basis, 3j/6j couplings, decay/dephasing operators, and correlations. | Quantify cavity-output single-photon statistics and temporal coherence under pulses. |
 | 5: Multidimensional optimization | Early infrastructure: a Cartesian parameter-grid runner exists. | Define objectives/constraints, search with the current pulse model, and report optima and trade-offs. |
 | 6: Complete analysis framework | Partial: UI, CSV output, NPZ export, and a batch-result viewer. | Unify the solver used by UI and batch; add photon-generation metrics to each saved run. |
@@ -35,13 +35,14 @@ they are not evidence that the original research analyses were completed.
 ## How the simulator works
 
 The Lambda process is laser excitation S-to-P followed by cavity-mediated
-P-to-D emission. A repump laser also couples D-to-P. The Yb extension replaces
+P-to-D emission. A simplified reset coupling also drives D-to-P. The Yb extension replaces
 each manifold with its hyperfine sublevels: four S, four P, and eight D states.
-Two truncated cavity Fock spaces are tensored with this atomic basis.
+The D3/2→P1/2 reset coupling (simplified stand-in for the 935 nm repump via
+3D[3/2]1/2) acts on the 2.438 micrometre line. Two truncated cavity Fock spaces are tensored with this atomic basis.
 
 The Hamiltonian contains rotating-frame detunings, Zeeman terms, drive and
-repump transitions weighted by angular-momentum factors, and cavity coupling.
-Separate Gaussian envelopes make the drive and repump terms time dependent.
+reset transitions weighted by angular-momentum factors, and cavity coupling.
+Separate Gaussian envelopes make the drive and reset terms time dependent.
 Collapse operators represent spontaneous emission, cavity leakage, and
 dephasing. QuTiP `mesolve` evolves the state; projectors give populations and
 `a.dag() * a`/`b.dag() * b` give intracavity photon numbers. Sliders rebuild
