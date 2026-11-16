@@ -82,14 +82,12 @@ class Yb171Factory:
     r""":class:`~atomic_physics.core.AtomFactory` for :math:`^{171}\mathrm{Yb}^+`.
 
     Attributes:
-        S12: the :math:`\left|n=6, S=1/2, L=0, J=1/2\right>` level.
-        P12: the :math:`\left|n=6, S=1/2, L=1, J=1/2\right>` level.
-        P32: the :math:`\left|n=6, S=1/2, L=1, J=3/2\right>` level.
-        D32: the :math:`\left|n=5, S=1/2, L=2, J=3/2\right>` level.
-        D52: the :math:`\left|n=5, S=1/2, L=2, J=5/2\right>` level.
-        ground_level: alias for the :math:`\left|n=6, S=1/2, L=0, J=1/2\right>` ground
-            level.
-        shelf: alias for the :math:`\left|n=5, S=1/2, L=2, J=5/2\right>` "shelf" level.
+        S12, P12, D32: the retained S1/2, P1/2 and D3/2 ionic manifolds.
+        D3212: auxiliary 3D[3/2]1/2 metadata with J=1/2, absent from the
+            evolved basis. Its legacy S,L fields are not an LS configuration
+            for calculating couplings; see docs/physics-references.md.
+        ground_level: alias for S12.
+        shelf: legacy compatibility alias for D3212.
     """
 
     S12: Level = Level(n=6, S=1 / 2, L=0, J=1 / 2)
