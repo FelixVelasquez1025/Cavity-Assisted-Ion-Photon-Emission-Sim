@@ -103,21 +103,21 @@ class Yb171Factory:
                 Ahfs=nu_S12 * consts.h,  
                 Bhfs=0,
                 g_J=lande_g_factor(self.S12),  
-                g_I=-0.0005362,  
+                g_I=-0.0005362,
             ),
             LevelData(
                 level=self.P12,
                 Ahfs=nu_P12 * consts.h,  
                 Bhfs=0,
                 g_J=lande_g_factor(self.P12),
-                g_I=0.0005362,  
+                g_I=-0.0005362,
             ),
             LevelData(
                 level=self.D32,
                 Ahfs=nu_D32 * consts.h,  
                 Bhfs=0,  
                 g_J=lande_g_factor(self.D32),
-                g_I=0.0005362,  
+                g_I=-0.0005362,
             ),
         )
         
