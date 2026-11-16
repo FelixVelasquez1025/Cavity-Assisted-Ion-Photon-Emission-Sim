@@ -53,7 +53,7 @@ A_D32_to_S12  = 1.0 / tau_D32                 # D3/2 -> S1/2
 # Angular frequencies (Using formula: ω = 2πc/λ)
 omega_369  = 2 * np.pi * consts.c / (369.5262e-9)   # S1/2 <-> P1/2
 omega_2438 = 2 * np.pi * consts.c / (2.438e-6)      # D3/2 <-> P1/2
-omega_435  = 2 * np.pi * consts.c / (435.5e-9)      # S1/2 <-> D3/2 
+omega_435  = 2 * np.pi * consts.c / (435.5e-9)      # S1/2 <-> D3/2 (E2; unused transition metadata)
 
 # I for Yb-171 is always 1/2 
 I = 0.5
