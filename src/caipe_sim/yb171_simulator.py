@@ -5,6 +5,16 @@ Hamiltonian values passed to QuTiP use angular-frequency units. See
 """
 
 from __future__ import annotations
+
+# IDE "Run file" and `python path/to/yb171_simulator.py` have no package
+# context. Resolve siblings from this checkout before importing them.
+if not __package__:
+  import sys
+  from pathlib import Path
+
+  sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+  __package__ = "caipe_sim"
+
 from .config import DEFAULT_FOCK_DIMENSION
 from caipe_sim.Yb171 import WAVELENGTH_DP_M, WAVELENGTH_SD_M
 import math

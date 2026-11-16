@@ -59,7 +59,15 @@ uv run python scripts/make_readme_figures.py
 uv run python scripts/check_fock_truncation.py
 ```
 
-The demo writes PNG/NPZ files to `outputs/`; the figure script regenerates `docs/figures/`. Use `uv run caipe-sim` for the UI on a graphical desktop.
+The demo writes PNG/NPZ files to `outputs/`; the figure script regenerates `docs/figures/`. For the UI on a graphical desktop, run from the repository root:
+
+```bash
+uv run caipe-sim
+```
+
+Direct-file launching also works with the project environment:
+`uv run python src/caipe_sim/yb171_simulator.py`. In an editor, select the
+repository’s `.venv` Python interpreter so its scientific dependencies are available.
 
 ## Status and limitations
 
