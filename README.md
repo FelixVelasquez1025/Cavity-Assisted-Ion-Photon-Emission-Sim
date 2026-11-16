@@ -1,57 +1,92 @@
 # CAIPE-sim — Yb-171 ion–photon emission
 
-Open-system simulation of a driven Yb-171 ion with two optical cavity polarization spaces, built to study cavity-assisted ion–photon emission.
+[![CPU validation](https://github.com/FelixVelasquez1025/Cavity-Assisted-Ion-Photon-Emission-Sim/actions/workflows/tests.yml/badge.svg)](https://github.com/FelixVelasquez1025/Cavity-Assisted-Ion-Photon-Emission-Sim/actions/workflows/tests.yml)
 
-![Resonant Gaussian Rabi pulse: simulation, analytic solution and residual](docs/figures/rabi_validation.png)
+Open-system simulation of a driven Yb-171 ion coupled to a two-polarization optical cavity, built to study cavity-assisted ion–photon emission.
 
-Simulation against the analytic Gaussian pulse-area solution, using the same setup as the [Rabi test](tests/portfolio/test_yb171.py); residuals are shown below the population. [Illustrative demo dynamics](docs/figures/demo_dynamics.png), with 4 Fock states per mode (maximum 4−5 population difference 2.413e-4; photon-number difference 7.532e-5).
+![Illustrative Yb-171 manifold populations, pulse envelopes and cavity photon numbers](docs/figures/demo_dynamics.png)
+
+Illustrative demo with 4 Fock states per mode; maximum 4−5 differences: populations 2.413e-4, photon numbers 7.532e-5.
+
+## How it works
+
+A 369 nm Gaussian pulse drives the ion from S to P. The cavity on the 2.438 µm D3/2–P1/2 line enhances P→D emission into the selected circular-polarization mode. A D→P reset coupling returns population toward S through P→S decay; it is a simplified stand-in for the 935 nm repump via 3D[3/2]1/2.
 
 ## What it models
 
-- A 16-state F,mF basis: S1/2 and P1/2 each have F=0,1; D3/2 has F=1,2. Hyperfine splittings are absent from the diagonal energies.
-- A 369.52604 nm S–P Gaussian drive and a D3/2→P1/2 **reset coupling**, a simplified stand-in for the 935 nm repump via 3D[3/2]1/2. That intermediate-level pathway is not simulated.
+- A 16-state F,mF basis: S1/2 and P1/2 each have F=0,1; D3/2 has F=1,2.
+- A 369.52604 nm S–P Gaussian drive and a D3/2→P1/2 reset coupling. The intermediate 935 nm pathway is not simulated.
 - Two circular-polarization spaces on the **2.438 µm D3/2–P1/2 cavity line**; one polarization couples per run.
-- P→S/P→D loss, cavity leakage and S/D dephasing, with explicit but unnormalized decay-input conventions.
+- P→S and P→D loss, cavity leakage and S/D dephasing, with explicit but unnormalized decay-input conventions.
 - CPU QuTiP master-equation evolution, a Matplotlib UI, and headless population/photon-number exports.
 
-## Parameters
+## Atomic inputs
 
-The demonstration uses these inputs. Amplitudes and decay settings are model scales; see the [exact conventions](docs/model-status.md#exact-amplitude-convention-behavior-preserved).
+Fixed atomic inputs are sourced; uncertainties, component assignments and the NIST derivation are in the [source guide][sources].
 
-| Parameter | Value | Units | Source |
+| Quantity | Value | Units | Source |
 | --- | --- | --- | --- |
-| Drive / reset amplitude input | 5 / 3 | MHz | Illustrative; [demo] |
-| Drive / reset pulse centre | 0.6 / 1.1 | µs | Illustrative; [demo] |
-| Drive / reset Gaussian sigma | 0.2 / 0.25 | µs | Illustrative; [demo] |
-| Drive / reset / cavity detuning; B | 0 / 0 / 0; 0 | MHz; G | Illustrative; [demo] |
-| Cavity coupling input; κ/(2π) | 0.5; 0.1 | MHz | Illustrative; [demo] |
-| γ_SP/(2π), γ_DP/(2π); S/D dephasing input | 0.01, 0.01; 0.000136 | MHz | Illustrative; [demo] |
-| Initial state; coupled mode | S,F=0,mF=0; left | — | Illustrative; [demo] |
-| Time window; samples | 0–2; 201 | µs; count | [demo] |
-| Fock dimension per mode | 4 | count | [Truncation decision](docs/fock-convergence.md) |
 | S–P vacuum wavelength | 369.52604 | nm | PRA 83, 013406, Table III; [sources] |
 | D–P vacuum Ritz wavelength | 2438.417759 | nm | NIST ASD level difference; [sources] |
-| P1/2 lifetime; P→D branching | 8.12; 0.00501 | ns; fraction | PRA 80, 022502; PRA 76, 052314; [sources] |
+| P1/2 lifetime | 8.12 | ns | PRA 80, 022502; [sources] |
+| P→D branching fraction | 0.00501 | fraction | PRA 76, 052314; [sources] |
 
-The UI starts in the same atomic state, left polarization, coupling and cavity loss, with its own field/pulse settings. Fixed atomic inputs, uncertainties and the NIST derivation are in the [source guide][sources].
+## Simulation settings
+
+These demo inputs are illustrative. Amplitudes and decay settings are model scales; see the [exact conventions](docs/model-status.md#exact-amplitude-convention-behavior-preserved).
+
+| Quantity | Value | Units | Source |
+| --- | --- | --- | --- |
+| Drive amplitude input | 5 | MHz | [demo] |
+| Reset amplitude input | 3 | MHz | [demo] |
+| Drive pulse centre | 0.6 | µs | [demo] |
+| Reset pulse centre | 1.1 | µs | [demo] |
+| Drive Gaussian sigma | 0.2 | µs | [demo] |
+| Reset Gaussian sigma | 0.25 | µs | [demo] |
+| Drive detuning | 0 | MHz | [demo] |
+| Reset detuning | 0 | MHz | [demo] |
+| Cavity detuning | 0 | MHz | [demo] |
+| Magnetic field | 0 | G | [demo] |
+| Cavity coupling input | 0.5 | MHz | [demo] |
+| κ/(2π) | 0.1 | MHz | [demo] |
+| γ_SP/(2π) | 0.01 | MHz | [demo] |
+| γ_DP/(2π) | 0.01 | MHz | [demo] |
+| S dephasing input | 0.000136 | MHz | [demo] |
+| D dephasing input | 0.000136 | MHz | [demo] |
+| Initial atomic state | S,F=0,mF=0 | — | [demo] |
+| Coupled mode | left | — | [demo] |
+| Initial time | 0 | µs | [demo] |
+| Final time | 2 | µs | [demo] |
+| Time samples | 201 | count | [demo] |
+| Fock dimension per mode | 4 | count | [Truncation decision](docs/fock-convergence.md) |
+
+The UI starts in the same atomic state, left polarization, coupling and cavity loss, with its own field and pulse settings.
 
 ## Validation
 
-[Tests](tests/portfolio/) and reproducible scripts check:
+![Resonant Gaussian Rabi pulse: simulation, analytic solution and residual](docs/figures/rabi_validation.png)
+
+Analytic Gaussian pulse-area comparison: maximum absolute population residual **3.40955548e-7**, with solver atol=1e-10 and rtol=1e-8; [shared Rabi test](tests/test_yb171.py).
+
+[Tests](tests/) and reproducible scripts check:
 
 - Selection rules and basis completeness.
 - Hamiltonian Hermiticity.
 - Population conservation and finite, nonnegative observables.
 - Analytic resonant Rabi evolution.
 - Signed hyperfine coefficients against evaluated Wigner 3j/6j reference values.
-- Zeeman slopes against Foot’s analytic Landé g_F formula (§6.3) and rounded reference values.
+- Zeeman slopes against Foot’s analytic Landé g_F formula (§6.3).
 - Fock truncation at dimensions 2, 3, 4 and 5: every **4 versus 5 difference is below 1e-3**, so the default is 4 for this demo sequence.
+
+Numerical checks, correction comparisons and their scope are in [validation notes](docs/validation-notes.md).
 
 ## Quickstart
 
-In a checkout of this branch, with Python 3.12+ and uv installed:
+With Python 3.12+ and uv installed:
 
 ```bash
+git clone https://github.com/FelixVelasquez1025/Cavity-Assisted-Ion-Photon-Emission-Sim.git
+cd Cavity-Assisted-Ion-Photon-Emission-Sim
 uv sync --locked
 uv run pytest
 uv run caipe-sim --demo
@@ -69,9 +104,9 @@ Direct-file launching also works with the project environment:
 `uv run python src/caipe_sim/yb171_simulator.py`. In an editor, select the
 repository’s `.venv` Python interpreter so its scientific dependencies are available.
 
-## Status and limitations
+## Limitations
 
-Inputs are illustrative and not fitted to experiment. The model uses the RWA, linear weak-field S/D Zeeman shifts, Markovian losses and a finite Fock basis. Missing diagonal hyperfine/P Zeeman terms, unnormalized decay scales and truncation sensitivity limit quantitative interpretation. See [model status](docs/model-status.md) and the [review report](docs/portfolio-review.md).
+Inputs are illustrative and not fitted to experiment. The model uses the RWA, linear weak-field S/D Zeeman shifts, Markovian losses and a finite Fock basis. Hyperfine splittings are absent from the diagonal energies. The missing P Zeeman term, unnormalized decay scales and truncation sensitivity also limit quantitative interpretation. See [model status](docs/model-status.md) and [validation notes](docs/validation-notes.md).
 
 ### Next steps
 

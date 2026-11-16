@@ -26,7 +26,7 @@ dev = ["pytest>=8"]
 packages = ["src/caipe_sim"]
 
 [tool.pytest.ini_options]
-testpaths = ["tests/portfolio"]
+testpaths = ["tests"]
 norecursedirs = ["archive", ".git", ".venv", "build", "dist"]
 
 [tool.hatch.build.targets.sdist]

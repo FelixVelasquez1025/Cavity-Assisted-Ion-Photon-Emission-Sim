@@ -1,4 +1,4 @@
-"""Signed reference checks, independent of the implementation's Wigner wrappers."""
+"""Signed Wigner checks and weak-field Zeeman checks (Foot, §6.3)."""
 
 import numpy as np
 import pytest
@@ -51,12 +51,11 @@ def test_hyperfine_coefficients_match_signed_reference(
     [("S12", 1, 1.4), ("P12", 1, .47), ("D32", 1, 1.4), ("D32", 2, .84)],
 )
 def test_zeeman_matches_reference(level, F, reference_mhz_per_gauss):
-    # First-order per-mF weak-field values requested for the Yb+ model.
+    """Check weak-field slopes using Foot’s analytic Landé g_F formula (§6.3)."""
     # Analytic reference: Foot, Atomic Physics (2005), §6.3 (pp. 108–112):
     # g_F = g_J*[F(F+1)+J(J+1)-I(I+1)]/[2F(F+1)]
     #     + g_I*[F(F+1)+I(I+1)-J(J+1)]/[2F(F+1)].
     # Here g_I is signed and expressed in Bohr-magneton units.
-    # Rounded slopes above are checked against this formula, not a level diagram.
     # Numerical g factors/convention: arXiv:2509.04416, Eqs. 16-23.
     # That source treats neutral Yb; this test evaluates the formula for the
     # ion's S/P/D quantum numbers, not its neutral-atom tabulated g_J values.

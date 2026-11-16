@@ -5,9 +5,8 @@ Photons from a Trapped-Ion Cavity-QED System_, PhD thesis, University of
 Sussex, June 2020**, supplies the calcium ion-cavity model. The earlier
 attribution to a different thesis was incorrect. The user's supplied Walker
 PDF is a reference, not a repository asset; no source PDF or level diagram
-is distributed here. The [review report](portfolio-review.md) describes the
-current model and cleanup; [Phase 1b results](phase1b-physics-review.md) are
-a historical checkpoint superseded by that report.
+is distributed here. The [validation notes](validation-notes.md) record current numerical checks
+and earlier atomic-data correction comparisons.
 
 ## Atomic inputs
 
@@ -107,7 +106,7 @@ The reference phase convention for absorption is
 ```
 
 Round and test the integer exponent itself, not twice the exponent. The
-fixed signed cases in [test_angular_momentum.py](../tests/portfolio/test_angular_momentum.py)
+fixed signed cases in [test_angular_momentum.py](../tests/test_angular_momentum.py)
 include evaluated 3j and 6j factors and odd exponents. Daniel A. Steck,
 [_Rubidium 87 D Line Data_](https://steck.us/alkalidata/rubidium87numbers.pdf),
 Sec. 3.3, Eqs. 35–39, supplies the convention check after translation from

@@ -1,20 +1,77 @@
-# Phase 1b physics corrections and checks
+# Validation notes
 
-Historical checkpoint: current values, paths and review status are superseded
-by [Phase 1c and the final review](portfolio-review.md).
+Current conventions and sources are in [model status](model-status.md) and
+[physics references](physics-references.md). Earlier numerical checkpoints
+are retained below with their original inputs; they are not current defaults.
 
-The pre-correction Step 1 audit (answers transferred to the final PR) remains the baseline. This work
-continues on `portfolio-cleanup` and stops before Steps 2–7. No source PDFs,
-level-diagram images, internal reference documents, or generated demo arrays
-were committed. Atomic inputs and source qualifications are catalogued in
-[physics-references.md](physics-references.md).
+## Current inputs and numerical checks
 
-## Changes, before and after
+- D splitting remains 0.86375 GHz; D A/h is now 0.431875 GHz, half the
+  splitting. S/P have J=1/2, so A/h equals splitting. Their metadata now
+  matches the existing precise S/P model inputs rather than rounded copies.
+- UI defaults are left polarization, cavity coupling input 0.5 MHz and
+  loss input 0.1 MHz; the radio selector reads the dictionary value.
+- S–P wavelength is now the vacuum S(F=1)↔P(F=0) component at 369.52604 nm
+  from PRA 83, 013406 (2011), Table III. This changes SP's reduced dipole
+  from 2.470477344688475 to 2.4704757401621955 ea0.
+- NIST ASD v5.12 (accessed 2026-11-16) gives S=0.00, D=22960.80 and
+  P=27061.82 cm⁻¹. Vacuum Ritz wavelengths from these levels are
+  2438.417759484226 nm (DP) and 435.5248946029755 nm (SD). DP's reduced
+  element changes from 2.9707976962590688 to 2.971561313205892 ea0.
+  These are fine-structure Ritz values, not hyperfine-component measurements.
+- All atomic provenance and precision limitations are in the source guide;
+  these calculations add no new calibrated experimental parameter.
+
+The extended [Fock check](fock-convergence.md) now compares dimensions 2, 3,
+4 and 5. The 3−4 comparison failed, but every 4−5 difference passes 1e-3:
+maximum population difference 0.000241316721655 and photon-number difference
+0.0000753242015548. The demo/UI default is therefore **4**, shared by both
+README figures and the analytic test. This is a sequence-specific check.
+
+The analytic solver check at dimension 2 reduced the maximum
+residual from 1.99684274e-5 to 1.64187332e-7 (about 122×) with atol=1e-10,
+rtol=1e-8. At the new default dimension 4 the residual is 3.40955548e-7;
+the test/figure comparison uses absolute tolerance 3.5e-6 and rtol=0
+(about 10× that residual). Only the analytic experiment uses tighter solver
+tolerances; the demo/truncation solver remains unchanged. Source: executed
+comparison/figure scripts and `run_rabi_validation`; no experimental
+accuracy is implied.
+
+The Zeeman test explicitly cites Foot §6.3 and writes out the analytic
+Landé g_F formula, including the signed nuclear term in Bohr-magneton
+units. Its reference is the formula, not a level diagram.
+
+## Basis and model scope
+
+The retained basis, in code order (manifold,F,mF), is:
+
+```text
+S: (0,0), (1,-1), (1,0), (1,+1)
+P: (0,0), (1,-1), (1,0), (1,+1)
+D: (1,-1), (1,0), (1,+1), (2,-2), (2,-1), (2,0), (2,+1), (2,+2)
+```
+
+The cavity spaces are circular polarizations on D–P, with one selected
+coupling per run. Drive is S–P; the direct DP reset is a simplified stand-in
+for the 935 nm pathway, not an explicit intermediate-level repump. UI and
+demo input defaults are documented in code and README; fixed atomic inputs
+and derived elements are catalogued with citations in the reference guide.
+
+Approximations: RWA, linear weak-field S/D Zeeman shifts, truncated Fock
+spaces and Markovian losses. Diagonal hyperfine and P Zeeman energies,
+normalized physical decay rates and motional dynamics are absent. The
+three deferred cavity tasks are simultaneous polarization coupling,
+pulse-resolved correlations, and useful-output flux/loss separation.
+
+## Atomic-data correction checkpoints
+
+The following table records an earlier correction checkpoint. Current values
+above supersede its intermediate wavelength and D A/h entries.
 
 | Item | Before | After / scope |
 | --- | --- | --- |
-| DP wavelength | 2.400 µm | 2.438 µm, as requested; `OMEGA_2400`/`omega_2400` → `OMEGA_2438`/`omega_2438`; `A_2400_to_D32` → `A_2438_to_D32`; transition key `2400` → `2438` |
-| Stored D hyperfine input | `HFS_A_GHZ`: 0.86372 GHz; `nu_D32`: 0.86 GHz | Both 0.86375 GHz; no diagonal hyperfine term added; A-versus-splitting qualification below |
+| DP wavelength | 2.400 µm | 2.438 µm; `OMEGA_2400`/`omega_2400` → `OMEGA_2438`/`omega_2438`; `A_2400_to_D32` → `A_2438_to_D32`; transition key `2400` → `2438` |
+| Stored D hyperfine input | `HFS_A_GHZ`: 0.86372 GHz; `nu_D32`: 0.86 GHz | Both 0.86375 GHz; no diagonal hyperfine term added; current A/h = 0.431875 GHz, as explained above |
 | P1/2 lifetime | 8.07 ns | 8.12 ns, PRA 80, 022502 (2009) |
 | Auxiliary 3D[3/2]1/2 | J=5/2; splitting 2.21 GHz | J=1/2; splitting 2.2095 GHz; lifetime remains 37.7 ns; absent from active basis |
 | P→D branching | 0.005 | 0.00501, published central value from PRA 76, 052314 (2007) |
@@ -24,20 +81,9 @@ were committed. Atomic inputs and source qualifications are catalogued in
 | Nuclear g metadata | S negative, P/D positive, magnitude 0.0005362 | All negative; active `G_I=-0.0005362` unchanged |
 | Hyperfine phase | Parity of `2*phase_exp` | Parity of the integer `phase_exp`; signed reference regression added |
 | Zeeman checks | No reference-slope checks | Four signed weak-field coefficients checked to within 2% |
-| Fock truncation | Fixed default dimension 2 per mode | Default still 2; optional `fock_dimension` permits dimension-3 comparison; measured results below |
 | Amplitude helper | Docstring claimed `Omega=E0`, while returning `E0/2` | Docstring and exact mapping corrected; all amplitude factors unchanged |
 | DP pulse naming | “Repump” without a pathway qualification | “D3/2→P1/2 reset coupling (simplified stand-in for the 935 nm repump via 3D[3/2]1/2)”; labels shortened to “reset” after that definition |
 | Compatibility | `omega_rep`, `rep_*`, `repump_MHz` | Canonical `omega_reset`, `reset_*`, `reset_MHz`; old names remain compatibility aliases; serialized UI/cache keys preserved |
-| References | Incorrect cavity-thesis attribution; atomic diagram attributions | Thomas Walker, Sussex PhD, June 2020; corrected equation references and published atomic-source catalogue with precision caveats |
-| Model status | Incomplete limitations and amplitude mapping | Explicit diagonal-energy, P Zeeman, cavity-line, polarization, decay-normalization, and truncation limitations |
-| README | Ambiguous cavity/reset description | Explicit 2.438 µm DP cavity and simplified reset; three deferred cavity-output tasks listed under Next steps; existing image marked as pre-correction; full landing-page rewrite and figure replacement deferred |
-| License | No LICENSE | MIT, copyright Felix Velasquez 2026, as instructed |
-
-Duplicate requested constants and hyperfine-phase code in
-`hamiltonian_utils.py` and the historical pre-time-dependent Yb example were
-corrected too. These remain separate, non-equivalent historical models;
-archiving and software consolidation have not started. The user's existing
-local edit to `docs/AUDIT.md` was preserved and excluded from these commits.
 
 ## Nuclear sign and provenance
 
@@ -51,21 +97,22 @@ See the [source catalogue](physics-references.md).
 
 ## Reduced elements and demo changes
 
-The baseline was measured before code changes at `bdb4765`. The A1–A3
-checkpoint was measured at `17e2946`, before the branching and phase changes.
-The final model includes the branching central-value update and corrected
-phase. All comparisons use the unchanged default demo pulse sequence,
+The baseline is the earlier atomic-data model (`bdb4765`). The intermediate
+checkpoint (`17e2946`) applies only the DP wavelength, D splitting and P
+lifetime corrections, before the branching and phase updates. The corrected-data
+checkpoint includes the branching central-value update and corrected phase,
+but predates the current NIST/SP wavelength refinements. All comparisons use the unchanged default demo pulse sequence,
 dimension 2 per mode, QuTiP 5.2.0, and `solver_options()`.
 These are numerical results from this checkout, not literature measurements.
 
 Reduced dipoles in ea0, calculated by `_rme_eq54` from the inputs:
 
-| Element | Baseline | After A1–A3 only | Final corrected model |
+| Element | Baseline | Intermediate data | Corrected-data checkpoint |
 | --- | --- | --- | --- |
 | SP | 2.47813125525 | 2.47048975924 | 2.47047734469 |
 | DP | 2.90768111381 | 2.96783134735 | 2.97079769626 |
 
-A1–A3 change SP by -0.308357% and DP by +2.068667% relative to baseline.
+The intermediate data change SP by -0.308357% and DP by +2.068667% relative to baseline.
 Including the branching central-value update gives -0.308858% and +2.170684%.
 The D hyperfine metadata correction does not affect this demo because
 hyperfine offsets are absent from the Hamiltonian.
@@ -73,7 +120,7 @@ hyperfine offsets are absent from the Hamiltonian.
 Population and occupation values from `simulate_demo()`; “final” is at
 2 microseconds, “peak” is the maximum over the 201 exported sample times:
 
-| Observable | Statistic | Baseline | After A1–A3 only | Final corrected model |
+| Observable | Statistic | Baseline | Intermediate data | Corrected-data checkpoint |
 | --- | --- | --- | --- | --- |
 | P_S | peak | 1 | 1 | 1 |
 | P_S | final | 0.775429538604 | 0.770164365585 | 0.770088579615 |
@@ -88,7 +135,7 @@ Population and occupation values from `simulate_demo()`; “final” is at
 
 Maximum absolute difference between complete sampled traces and baseline:
 
-| Observable | A1–A3 only | Final model |
+| Observable | Intermediate data | Corrected-data checkpoint |
 | --- | --- | --- |
 | P_S | 0.00762695200395 | 0.00791635572072 |
 | P_P | 0.00559891738641 | 0.00572512367489 |
@@ -141,11 +188,11 @@ correct under the documented convention.
 ## Zeeman reference checks
 
 Source: executed `lande_g_factors` with the existing spin/orbital/nuclear
-inputs and `g_F*MU_B*1e-4/(2*pi*1e6)`. References are the rounded values
-specified in Phase 1b; the angular-momentum formula and magnetic convention
-are sourced in [physics-references.md](physics-references.md).
+inputs and `g_F*MU_B*1e-4/(2*pi*1e6)`. The analytic reference is Foot, Atomic Physics (2005), §6.3. Numerical
+magnetic inputs and conventions are catalogued in
+[physics-references.md](physics-references.md).
 
-| Manifold and F | Calculated MHz/G per mF | Requested reference | Tolerance |
+| Manifold and F | Calculated MHz/G per mF | Comparison slope | Tolerance |
 | --- | --- | --- | --- |
 | S1/2, F=1 | 1.40087232997 | 1.4 | 2% |
 | P1/2, F=1 | 0.465622236848 | 0.47 | 2% |
@@ -158,12 +205,13 @@ in the active model.
 
 ## Fock dimension 3 comparison
 
-The [reproducible script](../scripts/check_fock_truncation.py) compares the
-same corrected demo at dimensions 2 and 3 per mode. See
+An earlier run compared the corrected-data checkpoint demo at dimensions 2
+and 3 per mode, before the NIST/SP wavelength refinements. The current
+[reproducible script](../scripts/check_fock_truncation.py) compares dimensions 2–5. See
 [fock-convergence.md](fock-convergence.md) for settings and individual values.
 Maximum manifold-population difference: **0.00863983443916**, in D
 (about 0.864 percentage points). Maximum left-mode photon-number difference:
-**0.00875758113188**. Right-mode difference: zero. The default remains 2.
+**0.00875758113188**. Right-mode difference: zero. The default was 2 at that checkpoint; it is now 4.
 These changes are not small compared to solver tolerances; neither dimension
 is certified as converged for a quantitative emission study.
 
@@ -179,47 +227,16 @@ zero-field and F=0 limits, and detuned Rabi resonances. No new constant is
 needed for the present weak-field approximation, but finite-field dynamics
 would change. This was not implemented; see [model-status.md](model-status.md).
 
-## New or clarified concerns, left unresolved
 
-- The D value requested as A is sourced to a paper reporting an F-level
-  splitting of 0.86(2) GHz. For I=1/2,J=3/2, splitting is `2*A`, with
-  the sign determined by level ordering. The requested 0.86375 is retained
-  as adopted metadata, not silently converted or inserted in energies.
-- The supplied wavelength paper's Table III reports 369.52604(6) nm for
-  S(F=1)–P(F=0), whereas the retained code input is 369.5262 nm. That value
-  was not changed because it was not an authorized atomic-data correction.
-  A direct published source for the adopted DP and E2 wavelength precision
-  is also still needed. These qualifications are explicit in the source guide.
-- arXiv:2509.04416 is about neutral Yb. Generic magnetic formulas and the
-  nuclear convention are useful here; neutral level-table g_J and hyperfine
-  data must not be substituted for ion data. The auxiliary metadata's
-  retained S,L fields are not an LS-coupled configuration consistent with
-  its corrected J, so it must not be used to build extra couplings as-is.
-- The existing UI dictionary starts with `system='pi'`, while the radio
-  selector starts at left and controls the solve. This was documented,
-  not changed. Default cavity coupling is still zero.
-- A similar doubled-parity pattern remains in `_clebsch_gordan` in the
-  historical/bosonic code. The active hyperfine E1 construction uses
-  Wigner symbols directly; the historical helper needs its own convention
-  tests before any broader fix. No speculative change was made.
-- Hyperfine diagonal offsets, P Zeeman shifts, normalized physical decay
-  rates, and intermediate-level repump dynamics remain absent. Simultaneous
-  two-polarization coupling, pulse-resolved correlations, and useful-output
-  loss separation remain outside scope and are listed in README Next steps.
+## Remaining physics qualifications
 
-## Validation and stopping point
+- The adopted D splitting 0.86375 GHz has more digits than the cited 0.86(2) GHz measurement; A/h is now correctly half that splitting. The current SP wavelength and NIST-derived DP/SD wavelengths supersede the historical checkpoint values.
+- arXiv:2509.04416 treats neutral Yb: use its generic magnetic formulas and nuclear convention, not neutral level spectroscopy as ion data. The auxiliary level’s retained S,L fields do not form an LS configuration consistent with its corrected J, and must not be used to build extra couplings as-is.
+- A doubled-parity pattern remains in the local bosonic `_clebsch_gordan` helper and archived code. The active hyperfine E1 construction uses Wigner symbols directly. Separate convention tests are needed before changing that helper.
+- Hyperfine diagonal offsets, P Zeeman shifts, normalized physical decay rates and intermediate-level repump dynamics remain absent. Simultaneous polarization coupling, pulse-resolved correlations and output-loss separation remain future work.
 
-Every committed fix was preceded by successful `uv sync`, `uv run pytest`,
-and `uv run caipe-sim --demo`. The final suite contains **20 passing cases**:
-the original 8, 7 signed coefficient cases, 4 Zeeman cases, and 1 reset-alias
-compatibility check. The intentional pre-fix phase test failure was resolved
-before committing or continuing. The final Fock comparison script ran
-successfully. The renamed UI initialized headlessly and its labels were
-inspected; desktop interaction was not exercised.
+## Software validation scope
 
-No default pulse or cavity dimension was changed. No amplitude half-factor
-was removed. No normalized decay model, P Zeeman term, or deferred cavity
-feature was added. The existing README result image is explicitly labeled pre-correction; its
-replacement is deferred to the requested later figure step. Baseline audit
-retained. No push, PR, archival operation,
-or Steps 2–7 work was performed; wait for the user's go-ahead.
+The suite checks selection rules, Hermiticity, population conservation, analytic Rabi dynamics, signed hyperfine coefficients, Zeeman slopes, hyperfine metadata, compatibility aliases and package boundaries. Historical models under `archive/` are excluded from the active distribution and tests. No active package imports historical `_clebsch_gordan` helpers; the distinct local bosonic helper still exists.
+
+Both direct-file and CLI UI launching have completed initial simulation and widget creation with Matplotlib Agg. An isolated subprocess regression checks file loading without package context from another working directory. Headless checks do not establish desktop interaction behavior. No experimental calibration or emission-performance claim follows from these numerical checks.

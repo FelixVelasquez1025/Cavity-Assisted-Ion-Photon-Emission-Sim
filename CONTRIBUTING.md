@@ -16,7 +16,7 @@ uv run python scripts/make_readme_figures.py
 uv run python scripts/check_fock_truncation.py
 ```
 
-The default test suite lives in `tests/portfolio/`. Historical tests under `archive/tests/` use obsolete APIs and are not
+The default test suite lives in `tests/`. Historical tests under `archive/tests/` use obsolete APIs and are not
 part of the active suite. When migrating a historical feature, replace its checks with tests that
 exercise the current public behavior.
 

@@ -22,7 +22,7 @@ no nuclear electric quadrupole term in this isotope.
 SP/DP reduced E1 elements are derived from published lifetimes, branching
 fractions and adopted wavelengths; they are no longer placeholders. The
 signed 3j/6j recoupling convention is checked in
-[tests/portfolio/test_angular_momentum.py](../tests/portfolio/test_angular_momentum.py).
+[tests/test_angular_momentum.py](../tests/test_angular_momentum.py).
 Source details and qualifications are in [physics-references.md](physics-references.md).
 Linear Zeeman shifts are included only for S and D; quadratic shifts,
 P shifts, and field-induced mixing are absent. See [model-status.md](model-status.md).

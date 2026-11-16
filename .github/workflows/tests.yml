@@ -17,7 +17,7 @@ jobs:
       - name: Validate hyperfine and pulse dynamics
         env:
           MPLBACKEND: Agg
-        run: uv run pytest tests/portfolio
+        run: uv run pytest tests
       - name: Export the CPU demo
         run: uv run caipe-sim --demo
       - name: Reproduce Rabi and demo figures

@@ -2,7 +2,7 @@
 
 The active application is `src/caipe_sim/yb171_simulator.py`. Phase 1b
 corrected atomic inputs and the signed hyperfine phase; its
-[results report](phase1b-physics-review.md) records the numerical effects.
+[validation notes](validation-notes.md) records the numerical effects.
 Amplitude and decay conventions were preserved. This remains an exploratory
 model: the tests establish numerical invariants and limiting cases, not a
 completed photon-generation performance or calibration study.
@@ -94,7 +94,7 @@ Verify the weak-field slope, opposite mF symmetry, F=0 and zero-field
 limits, Hermiticity, and detuned Rabi transition frequencies. The existing
 `test_zeeman_matches_reference` checks the P g_F calculation only, not an
 implemented P term. The expected coefficient and its source are recorded
-in the [Phase 1b report](phase1b-physics-review.md). This change would alter
+in the [validation notes](validation-notes.md). This change would alter
 finite-field dynamics and requires a separate reviewed physics commit.
 
 ## Exact amplitude convention (behavior preserved)
@@ -121,7 +121,7 @@ envelope directly and includes the actual matrix element in its pulse area.
 Sources: `rabi_frequencies`, `_build_systems_hf`, `build_and_solve` in
 [yb171_simulator.py](../src/caipe_sim/yb171_simulator.py),
 [demo.py](../src/caipe_sim/demo.py), and
-[test_gaussian_pi_pulse_matches_analytic_rabi_solution](../tests/portfolio/test_yb171.py).
+[test_gaussian_pi_pulse_matches_analytic_rabi_solution](../tests/test_yb171.py).
 Only the contradictory docstrings have changed; no amplitude factors were
 removed. The older `hamiltonian_utils.py` uses a different convention and
 must not be treated as the same solver.
@@ -158,5 +158,5 @@ bosonic path. The default hyperfine path uses signed Wigner 3j/6j factors
 directly; the historical/bosonic helper was not silently corrected.
 
 The CLI, demo and validation use CPU QuTiP. Current tests live in
-[tests/portfolio/](../tests/portfolio/). The default is illustrative and not
-a precision calibration recommendation. See the [review report](portfolio-review.md).
+[tests/](../tests/). The default is illustrative and not
+a precision calibration recommendation. See the [validation notes](validation-notes.md).
