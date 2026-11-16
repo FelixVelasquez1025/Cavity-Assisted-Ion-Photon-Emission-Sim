@@ -99,7 +99,7 @@ G_I = -0.0005362
 # Reduced E1 matrix elements (C·m) for the Yb⁺ manifolds used here.
 _EA0 = consts.e * consts.physical_constants["Bohr radius"][0]
 
-# Diagram-derived lifetimes, branching ratios, and angular frequencies
+# Published/adopted atomic inputs: see docs/physics-references.md.
 TAU_P12 = 8.12e-9       # 6p 2P1/2
 TAU_D32 = 52.7e-3       # 5d 2D3/2
 BR_P12_TO_S12 = 1.0 - 0.00501
@@ -301,7 +301,7 @@ def _rme_eq54(beta: float, omega: float, tau: float, Je: float) -> float:
   return math.sqrt(num / denom)
 
 
-# Compute reduced dipole matrix elements (C·m) from diagram parameters
+# Compute published-input reduced dipole matrix elements (C·m) from diagram parameters
 REDUCED_E1_ELEMENTS = {
   "2S12_to_2P12": _rme_eq54(BR_P12_TO_S12, OMEGA_369, TAU_P12, Je=0.5)/_EA0,
   "2D32_to_2P12": _rme_eq54(BR_P12_TO_D32, OMEGA_2438, TAU_P12, Je=0.5)/_EA0,

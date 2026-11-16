@@ -1,8 +1,12 @@
-r""":math:`^{171}\mathrm{Yb}^+`
+r"""171Yb+ metadata; published inputs are catalogued in docs/physics-references.md.
 
-References::
-    - 171Yb Reference Data (Kroeze, Kristensen, Pucher, 2025). Table 5 for g_J, Zeeman coefficients, and A_hfs/h.
-      Values used here are taken verbatim from that table (no inference), with unit conversions to Hz where needed. (https://arxiv.org/abs/2509.04416)
+Wavelength context: PRA 83, 013406 (2011).
+P lifetime: PRA 80, 022502 (2009); D lifetime: PRA 61, 022507 (2000).
+Auxiliary lifetime: J. Phys. B 26, L701 (1993).
+Branching and auxiliary HFS: PRA 76, 052314 (2007).
+S HFS: IEEE Trans. UFFC 44, 344 (1997); P HFS: PRA 49, 3351 (1994).
+Magnetic-moment convention: arXiv:2509.04416 (neutral Yb; not ion level data).
+Stored D HFS is a requested adopted value; resolve A versus splitting before use.
 """
 
 import numpy as np
@@ -35,12 +39,12 @@ class Transition:
 
 # Transition data 
 
-# Lifetimes of each level (Straight from diagram)
+# Lifetimes: published sources listed in the module docstring.
 tau_P12   = 8.12e-9       # 6p 2P1/2
 tau_D32   = 52.7e-3       # 5d 2D3/2
 tau_D3212  = 37.7e-9      # 3D[3/2]1/2  
 
-# Branching ratios        (Straight from diagram)
+# Branching: PRA 76, 052314 (2007); retain the two-branch complement.
 BR_P12_to_S12 = 1.0 - 0.00501
 BR_P12_to_D32 = 0.00501
 
@@ -58,7 +62,7 @@ omega_435  = 2 * np.pi * consts.c / (435.5e-9)      # S1/2 <-> D3/2 (E2; unused 
 # I for Yb-171 is always 1/2 
 I = 0.5
 
-# Hyperfine splittings frequencies (Straight from diagram)
+# Hyperfine metadata: source and A-versus-splitting caveat in physics-references.md.
 nu_S12 =   12.64e9   # F=1 <-> F=0  (6s 2S1/2)
 nu_P12 =   2.11e9    # F=1 <-> F=0  (6p 2P1/2)
 nu_D32 =   0.86375e9    # F=2 <-> F=1  (5d 2D3/2)

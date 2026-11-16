@@ -1,8 +1,8 @@
 # Review against the original seven-week plan
 
 Reviewed October 1, 2026, using the local code, saved results, Git history, and
-the supplied thesis: Travers Ward, *Generation of phase controlled single
-photons*, PhD thesis, University of Sussex, September 2022.
+the supplied thesis: Thomas Walker, *Single Photons from a Trapped-Ion Cavity-QED
+System*, PhD thesis, University of Sussex, June 2020.
 
 The separately calculated Yb numerical values are treated as verified inputs.
 This review concerns implemented behavior and completed analysis. Work not
@@ -50,18 +50,18 @@ and solve the model for new parameters.
 
 ## What the thesis clarifies
 
-- Section 2.3, Eqs. 2.30–2.35, uses collapse operators proportional to
+- Sections 2.2 and 2.4, Eqs. 2.2.6–2.2.7 and 2.4.16–2.4.19, uses collapse operators proportional to
   `sqrt(2 gamma)` and `sqrt(2 kappa)`. The factor of two in the newer model is
   consistent with that convention.
-- Section 2.2 uses a rotating frame referenced to the P state. Absence of
+- Section 2.3 uses a rotating frame referenced to the P state. Absence of
   absolute optical energies is expected. For the Yb extension, document which
-  hyperfine transition defines each detuning. The thesis also includes the P
-  Zeeman term (Eq. 2.18), while the active implementation builds S and D terms.
-- The thesis adds both cavity couplings, `H_a + H_b` (Eq. 2.26). The active
+  hyperfine transition defines each detuning. The active implementation builds S and D Zeeman terms but no P
+  term; adding the latter requires a separate model change.
+- The thesis adds both cavity couplings, `H_a + H_b` (Eqs. 2.4.14–2.4.15). The active
   builder selects the left or right coupling with its polarization branch;
   its pi branch adds no cavity coupling. This is a restricted implementation,
   not yet the complete bimodal model described in the thesis.
-- Section 2.5, Eqs. 2.47–2.48, converts intracavity occupancy into output flux
+- Section 2.6, Eqs. 2.6.3–2.6.5, converts intracavity occupancy into output flux
   and integrates it. In the newer code's convention, useful output has flux
   `2 kappa_out <n(t)>`; total cavity decay can include undesired loss too.
   That integral is a mean emitted photon count. It equals a single-photon

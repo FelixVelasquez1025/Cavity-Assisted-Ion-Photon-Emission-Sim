@@ -16,7 +16,7 @@ is the pulse-enabled Yb-171 application. See [model status](docs/model-status.md
 for the assumptions and scientific validation still needed.
 The primary physics reference is C. J. Foot's *Atomic Physics* (Oxford, 2005).
 See the [physics reference guide](docs/physics-references.md) for the textbook
-sections, the Ward cavity model, and the separately verified Yb inputs.
+sections, the Walker cavity model, and the separately verified Yb inputs.
 
 ![Yb-171 CPU demonstration](docs/images/yb171_demo.png)
 

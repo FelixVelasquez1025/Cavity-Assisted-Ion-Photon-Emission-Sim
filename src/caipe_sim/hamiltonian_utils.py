@@ -226,7 +226,7 @@ def _e1_cgc(j_lower: float, m_lower: float, j_upper: float, m_upper: float) -> f
 
 _EA0 = consts.e * consts.physical_constants["Bohr radius"][0]
 
-# Diagram-derived lifetimes, branching ratios, and angular frequencies
+# Published/adopted atomic inputs: see docs/physics-references.md.
 TAU_P12 = 8.12e-9  # 6p 2P1/2
 TAU_D32 = 52.7e-3  # 5d 2D3/2
 BR_P12_TO_S12 = 1.0 - 0.00501

@@ -47,7 +47,7 @@ optional JAX/GPU execution were not exercised.
 ## Remaining portfolio work
 
 The [review against the seven-week plan](plan-review.md) incorporates the
-foundational Travers Ward thesis and the user's confirmation that the Yb
+foundational Thomas Walker thesis and the user's confirmation that the Yb
 numerical inputs were independently verified.
 
 1. Complete the model-to-thesis mapping and photon-output analysis described

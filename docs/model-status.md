@@ -4,10 +4,10 @@ The portfolio application uses `src/caipe_sim/yb171_simulator.py`, preserved
 from the latest pulse-enabled Yb-171 example. Packaging changes do not retune
 the existing Hamiltonian or decay conventions. This is an exploratory model;
 the current tests establish numerical invariants and an analytic pulse limit,
-not a completed photon-generation performance study. The Yb numerical inputs
-were computed separately and are treated as verified, as confirmed by the user.
+not a completed photon-generation performance study. Atomic inputs were corrected in Phase 1b and are now individually sourced;
+the source-precision and metadata qualifications are explicit in the reference guide.
 See [the plan review](plan-review.md) for the comparison with the founding thesis.
-Foot's *Atomic Physics* (2005) is the primary physics reference; Ward provides
+Foot's *Atomic Physics* (2005) is the primary physics reference; Thomas Walker provides
 the specialized cavity model. The [reference guide](physics-references.md)
 records the relevant sections and translates their conventions.
 
@@ -68,13 +68,13 @@ must not be treated as the same solver.
 
 ## Remaining model and analysis work
 
-1. **Rotating-frame mapping.** Ward's thesis references the excited P state and
+1. **Rotating-frame mapping.** Walker's thesis (Eq. 2.3.7) references the excited P state and
    expresses the Hamiltonian in detunings, so absolute optical energies need
    not appear. Document which Yb hyperfine transitions define those detunings
    and how relative offsets are handled. The active code builds S and D Zeeman
-   terms; the thesis also includes a P term (Eq. 2.18). This concerns using the
+   terms but no P term; adding a P term is a separate model correction. This concerns using the
    verified constants in the Hamiltonian, not recalculating the constants.
-2. **Both cavity polarizations.** The thesis uses `H_a + H_b` (Eq. 2.26). The
+2. **Both cavity polarizations.** The thesis uses `H_a + H_b` (Eqs. 2.4.14–2.4.15). The
    current selected branch includes one cavity coupling; pi includes none.
    Establish whether the intended protocol deliberately restricts the modes
    or should evolve both simultaneously.
@@ -91,8 +91,8 @@ must not be treated as the same solver.
    integration settings, then quantify pulse speed, emission, and coherence
    over a parameter grid. The small demo is a numerical illustration.
 
-The `sqrt(2 * gamma)` and `sqrt(2 * kappa)` collapse amplitudes match Ward's
-thesis, Eqs. 2.30–2.35. That factor of two is intentional. Record the rate and
+The `sqrt(2 * gamma)` and `sqrt(2 * kappa)` collapse amplitudes match Walker's
+thesis, Eqs. 2.2.6–2.2.7 and 2.4.16–2.4.19. That factor of two is intentional. Record the rate and
 angular-weight conventions alongside the verified Yb inputs so that older
 and newer model results can be compared consistently.
 
