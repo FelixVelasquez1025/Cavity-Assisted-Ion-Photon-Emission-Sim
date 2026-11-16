@@ -69,3 +69,17 @@ def test_zeeman_matches_reference(level, F, reference_mhz_per_gauss):
         shift = float(np.real(h[i1, i1]-h[i0, i0])) / (2*np.pi*1e6)
         assert shift == pytest.approx(reference_mhz_per_gauss, rel=.02)
     # P currently has no diagonal Zeeman term: only its g_F formula is checked.
+
+
+def test_hyperfine_metadata_reproduces_adopted_splittings():
+    # E_F=A*K/2, I=1/2: splitting is A for S/P and 2*A for D.
+    # Sources: physics-references.md; D splitting: PRA 76, 052314 (2007).
+    from scipy.constants import h
+
+    expected = {"S": 12.642812118466e9, "P": 2.105e9, "D": .86375e9}
+    for name, atom_level in [("S", model.Yb171.S12), ("P", model.Yb171.P12), ("D", model.Yb171.D32)]:
+        data = next(d for d in model.Yb171.level_data if d.level is atom_level)
+        f_low, f_high = abs(atom_level.J-.5), atom_level.J+.5
+        delta_k = f_high*(f_high+1)-f_low*(f_low+1)
+        assert (data.Ahfs/h)*delta_k/2 == pytest.approx(expected[name])
+        assert model.HFS_A_GHZ[name]*1e9 == pytest.approx(data.Ahfs/h)

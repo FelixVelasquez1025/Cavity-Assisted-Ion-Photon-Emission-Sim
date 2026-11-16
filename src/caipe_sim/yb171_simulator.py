@@ -84,11 +84,11 @@ HBAR = consts.hbar
 MU_B = consts.physical_constants["Bohr magneton"][0] / HBAR
 I_NUCLEAR = 0.5  # Yb-171 nuclear spin
 
-# Hyperfine magnetic-dipole constants (A) in GHz.
+# Hyperfine A/h in GHz. S/P (J=1/2): A/h equals the F splitting.
 HFS_A_GHZ = {
   'S': 12.642812118466,  # plus quadratic Zeeman term noted below
   'P': 2.105,
-  'D': 0.86375,
+  'D': 0.431875,  # A/h = splitting/2 = 0.86375/2 GHz (PRA 76, 052314).
 }
 
 # values for electron spin g-factor (G_S), orbital g-factor (G_L), and nuclear spin factor (G_I) all from (https://arxiv.org/pdf/2509.04416)

@@ -6,7 +6,7 @@ Auxiliary lifetime: J. Phys. B 26, L701 (1993).
 Branching and auxiliary HFS: PRA 76, 052314 (2007).
 S HFS: IEEE Trans. UFFC 44, 344 (1997); P HFS: PRA 49, 3351 (1994).
 Magnetic-moment convention: arXiv:2509.04416 (neutral Yb; not ion level data).
-Stored D HFS is a requested adopted value; resolve A versus splitting before use.
+D splitting is 0.86375 GHz; metadata stores A/h=0.431875 GHz (splitting/2).
 """
 
 import numpy as np
@@ -63,8 +63,8 @@ omega_435  = 2 * np.pi * consts.c / (435.5e-9)      # S1/2 <-> D3/2 (E2; unused 
 I = 0.5
 
 # Hyperfine metadata: source and A-versus-splitting caveat in physics-references.md.
-nu_S12 =   12.64e9   # F=1 <-> F=0  (6s 2S1/2)
-nu_P12 =   2.11e9    # F=1 <-> F=0  (6p 2P1/2)
+nu_S12 =   12.642812118466e9   # F=1 <-> F=0  (6s 2S1/2)
+nu_P12 =   2.105e9    # F=1 <-> F=0  (6p 2P1/2)
 nu_D32 =   0.86375e9    # F=2 <-> F=1  (5d 2D3/2)
 nu_D3212 = 2.2095e9    # F=0 <-> F=1  (3D[3/2]1/2)
 
@@ -116,7 +116,7 @@ class Yb171Factory:
             ),
             LevelData(
                 level=self.D32,
-                Ahfs=nu_D32 * consts.h,  
+                Ahfs=(nu_D32 / 2) * consts.h,  # A = splitting/2 for I=1/2,J=3/2.
                 Bhfs=0,  
                 g_J=lande_g_factor(self.D32),
                 g_I=-0.0005362,
