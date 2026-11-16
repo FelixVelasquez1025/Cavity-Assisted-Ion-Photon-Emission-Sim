@@ -44,7 +44,7 @@ The UI starts in the same atomic state, left polarization, coupling and cavity l
 - Population conservation and finite, nonnegative observables.
 - Analytic resonant Rabi evolution.
 - Signed hyperfine coefficients against evaluated Wigner 3j/6j reference values.
-- Zeeman slopes against published formulas and rounded reference values.
+- Zeeman slopes against Foot’s analytic Landé g_F formula (§6.3) and rounded reference values.
 - Fock truncation at dimensions 2, 3, 4 and 5: every **4 versus 5 difference is below 1e-3**, so the default is 4 for this demo sequence.
 
 ## Quickstart

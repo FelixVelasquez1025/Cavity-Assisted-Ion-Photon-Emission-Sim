@@ -52,7 +52,12 @@ def test_hyperfine_coefficients_match_signed_reference(
 )
 def test_zeeman_matches_reference(level, F, reference_mhz_per_gauss):
     # First-order per-mF weak-field values requested for the Yb+ model.
-    # Landé formula and Bohr-magneton convention: arXiv:2509.04416, Eqs. 16-23.
+    # Analytic reference: Foot, Atomic Physics (2005), §6.3 (pp. 108–112):
+    # g_F = g_J*[F(F+1)+J(J+1)-I(I+1)]/[2F(F+1)]
+    #     + g_I*[F(F+1)+I(I+1)-J(J+1)]/[2F(F+1)].
+    # Here g_I is signed and expressed in Bohr-magneton units.
+    # Rounded slopes above are checked against this formula, not a level diagram.
+    # Numerical g factors/convention: arXiv:2509.04416, Eqs. 16-23.
     # That source treats neutral Yb; this test evaluates the formula for the
     # ion's S/P/D quantum numbers, not its neutral-atom tabulated g_J values.
     atom_level = getattr(model.Yb171, level)

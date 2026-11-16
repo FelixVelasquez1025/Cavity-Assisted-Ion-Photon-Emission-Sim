@@ -38,6 +38,10 @@ tolerances; the demo/truncation solver remains unchanged. Source: executed
 comparison/figure scripts and `run_rabi_validation`; no experimental
 accuracy is implied.
 
+The Zeeman test explicitly cites Foot §6.3 and writes out the analytic
+Landé g_F formula, including the signed nuclear term in Bohr-magneton
+units. Its reference is the formula, not a level diagram.
+
 ## Repository changes
 
 Historical code, examples, notebooks and tests are archived with git moves.
