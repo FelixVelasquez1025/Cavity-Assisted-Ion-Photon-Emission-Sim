@@ -27,6 +27,35 @@ one-half factor and a reduced matrix element. Treat the amplitude sliders as
 model inputs under the existing convention, and document the relationship to
 the separately verified transition-specific Rabi frequencies.
 
+## Exact amplitude convention (behavior preserved)
+
+Let `A` be either amplitude slider input in MHz and `c_ul` the signed
+SP or DP entry in `E1_DATA_HF`, including its reduced dipole element in
+atomic units. The code computes `E0 = 2*pi*1e6*A`, then
+`rabi_frequencies(E0) = E0/2`. The unit-amplitude laser builder contributes
+`c_ul/2`, so, with `f(t) = exp(-(t-t0)^2/(2*sigma^2))`,
+
+```text
+(H/hbar)_ul(t) = (2*pi*1e6*A) * c_ul * f(t) / 4   [rad/s]
+Omega_ul(t)    = (2*pi*1e6*A) * c_ul * f(t) / 2   [rad/s]
+```
+
+The latter is the signed transition Rabi frequency in the convention
+`H_ul/hbar = Omega_ul/2`; its magnitude enters the isolated resonant
+two-level population formula in Foot, Eq. 7.29. The slider is not a
+calibrated electric field or measured transition Rabi frequency. The demo's
+envelope export is the intermediate `E0*f(t)/2`, divided by `2*pi*1e6`,
+not `Omega_ul/(2*pi*1e6)`. The analytic test supplies that intermediate
+envelope directly and includes the actual matrix element in its pulse area.
+
+Sources: `rabi_frequencies`, `_build_systems_hf`, `build_and_solve` in
+[yb171_simulator.py](../src/caipe_sim/yb171_simulator.py),
+[demo.py](../src/caipe_sim/demo.py), and
+[test_gaussian_pi_pulse_matches_analytic_rabi_solution](../tests/portfolio/test_yb171.py).
+Only the contradictory docstrings have changed; no amplitude factors were
+removed. The older `hamiltonian_utils.py` uses a different convention and
+must not be treated as the same solver.
+
 ## Remaining model and analysis work
 
 1. **Rotating-frame mapping.** Ward's thesis references the excited P state and

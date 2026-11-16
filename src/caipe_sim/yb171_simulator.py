@@ -533,15 +533,13 @@ E1_DATA_HF = precompute_e1_coeffs_hyperfine()
 
 
 def rabi_frequencies(E0_driv: float, E0_rep: float) -> Tuple[float, float]:
-  """Compute Ω_driv and Ω_rep (rad/s) for Eqs. 2.4.12 and 2.4.13.
+  """Return half of each angular-frequency-scale amplitude input (rad/s).
 
-  Uses Eq. 2.1.8 with ħ = 1. The polarization geometry factor (ε·d)
-  is handled by the Clebsch-Gordan structure inside the sigma operators
-  built in this module, so here Ω = E0 in rad/s.
-
-  Parameters
-  - E0_driv: driving laser field amplitude (rad/s scale)
-  - E0_rep: repump laser field amplitude (rad/s scale)
+  This preserves the existing amplitude convention: each returned envelope
+  coefficient is E0/2. The laser transition builders additionally multiply
+  by coeff/2, giving a peak off-diagonal Hamiltonian element E0*coeff/4.
+  These inputs are model scales, not electric fields in V/m or calibrated
+  transition Rabi frequencies. See docs/model-status.md for the slider map.
   """
   return float(E0_driv) / 2.0, float(E0_rep) / 2.0
 
@@ -790,9 +788,9 @@ def H_cavity_DP_modes_hf(g: float, N_a: int, N_b: int, dim_atom: int = HF_BASIS_
 def H_laser_systems_from_E0(E0_driv: float, E0_rep: float, dim: int = 8, e1_coeffs=None) -> Dict[str, Qobj]:
   """Laser Hamiltonians using field amplitudes E0 (rad/s scale).
 
-  Implements Eq. 2.1.8 with ħ = 1 and the polarization geometry handled by
-  CGCs in the sigma terms; we therefore pass Ω = E0 to _build_systems, which
-  already applies the 1/2 prefactor internally.
+  rabi_frequencies returns E0/2; _build_systems applies another 1/2 and
+  the transition coefficient. The peak matrix element is E0*coeff/4.
+  The input scale is not an electric field in SI units.
   """
   Omega_driv, Omega_rep = rabi_frequencies(E0_driv, E0_rep)
   Hsp = _build_systems('SP', float(Omega_driv), _index_from_local, dim, e1_coeffs=e1_coeffs)
