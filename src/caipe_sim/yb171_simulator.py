@@ -288,7 +288,7 @@ def wigner_6j(j1: float, j2: float, j3: float, j4: float, j5: float, j6: float) 
 def hyperfine_angular_factor(Jp: float, Fp: float, J: float, F: float, I: float = 0.5) -> float:
   """Angular factor for hyperfine-coupled fermionic isotopes (Eq. (2) in doc)."""
   phase_exp = Jp + I + F + 1
-  phase = 1.0 if int(round(2 * phase_exp)) % 2 == 0 else -1.0
+  phase = 1.0 if int(round(phase_exp)) % 2 == 0 else -1.0
   prefac = math.sqrt((2 * Fp + 1) * (2 * F + 1))
   sixj = wigner_6j(Jp, Fp, I, F, J, 1.0)
   return phase * prefac * sixj
