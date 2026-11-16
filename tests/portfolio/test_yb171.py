@@ -3,10 +3,10 @@
 import numpy as np
 import pytest
 from qutip import basis, mesolve, qeye
-from scipy.special import erf
 
 from caipe_sim import yb171_simulator as model
 from caipe_sim.demo import simulate_demo
+from caipe_sim.validation import run_rabi_validation
 
 
 def test_hyperfine_projectors_partition_the_basis():
@@ -42,25 +42,10 @@ def test_cavity_coupling_is_hermitian():
 
 
 def test_gaussian_pi_pulse_matches_analytic_rabi_solution():
-    # With pi polarization and no decay/repump, S(F=0,m=0) couples only to
-    # P(F=1,m=0). This is an isolated resonant two-level subsystem.
-    ground = model.hf_state_index("S", 0.0, 0.0)
-    excited = model.hf_state_index("P", 1.0, 0.0)
-    h = model._build_systems_hf("SP", 1.0, 16)["pi"]
-    times = np.linspace(0.0, 2e-6, 201)
-    args = dict(drive_amp=2 * np.pi * 1e6, drive_t0=1e-6, drive_sigma=0.2e-6)
-    p_e = basis(16, excited).proj()
-    result = mesolve(
-        [h * 0, [h, model.omega_drive]], basis(16, ground), times,
-        e_ops=[p_e], args=args, options=model.solver_options(),
-    )
-    sigma, t0 = args["drive_sigma"], args["drive_t0"]
-    area = args["drive_amp"] * sigma * np.sqrt(np.pi / 2) * (
-        erf((times - t0) / (np.sqrt(2) * sigma)) - erf(-t0 / (np.sqrt(2) * sigma))
-    )
-    expected = np.sin(abs(h[excited, ground]) * area) ** 2
-    assert expected.max() > 0.1
-    np.testing.assert_allclose(result.expect[0], expected, atol=2e-5)
+    data = run_rabi_validation()
+    assert data["analytic"].max() > .1
+    np.testing.assert_allclose(data["simulated"], data["analytic"], atol=2e-5)
+
 
 
 @pytest.fixture(scope="module")

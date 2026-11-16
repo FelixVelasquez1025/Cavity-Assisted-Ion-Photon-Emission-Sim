@@ -5,6 +5,7 @@ Hamiltonian values passed to QuTiP use angular-frequency units. See
 """
 
 from __future__ import annotations
+from .config import DEFAULT_FOCK_DIMENSION
 from caipe_sim.Yb171 import WAVELENGTH_DP_M, WAVELENGTH_SD_M
 import math
 from typing import Dict, List, Tuple, Callable
@@ -1221,7 +1222,7 @@ def interactive_populations():
   if use_bosonic:
     N_a = N_b = 3
   else:
-    N_a = N_b = 2
+    N_a = N_b = DEFAULT_FOCK_DIMENSION
   Ia = qeye(N_a)
   Ib = qeye(N_b)
   I_atom = qeye(dim_atom)

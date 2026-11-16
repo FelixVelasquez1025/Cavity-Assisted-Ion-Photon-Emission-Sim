@@ -8,11 +8,13 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from .config import DEFAULT_FOCK_DIMENSION
+
 import numpy as np
 from qutip import basis, destroy, mesolve, qeye, tensor
 
 
-def simulate_demo(*, fock_dimension: int = 2) -> dict[str, np.ndarray]:
+def simulate_demo(*, fock_dimension: int = DEFAULT_FOCK_DIMENSION) -> dict[str, np.ndarray]:
     """Run the illustrative pulse sequence; vary truncation for convergence checks.
 
     ``fock_dimension`` is the number of Fock states per polarization mode.

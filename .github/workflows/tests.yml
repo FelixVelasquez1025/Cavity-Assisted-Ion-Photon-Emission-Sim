@@ -20,7 +20,13 @@ jobs:
         run: uv run pytest tests/portfolio
       - name: Export the CPU demo
         run: uv run caipe-sim --demo
+      - name: Reproduce Rabi and demo figures
+        run: uv run python scripts/make_readme_figures.py
+      - name: Check Fock truncation sensitivity
+        run: uv run python scripts/check_fock_truncation.py
       - uses: actions/upload-artifact@v4
         with:
           name: yb171-demo
-          path: outputs/
+          path: |
+            outputs/
+            docs/figures/
