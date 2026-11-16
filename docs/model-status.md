@@ -1,16 +1,18 @@
 # Model status
 
-The portfolio application uses `src/caipe_sim/yb171_simulator.py`, preserved
-from the latest pulse-enabled Yb-171 example. Phase 1b corrected atomic inputs and the
-signed hyperfine phase; its [results report](phase1b-physics-review.md)
-records the numerical effects. Amplitude and decay conventions were preserved. This is an exploratory model;
-the current tests establish numerical invariants and an analytic pulse limit,
-not a completed photon-generation performance study. Atomic inputs were corrected in Phase 1b and are now individually sourced;
-the source-precision and metadata qualifications are explicit in the reference guide.
-See [the plan review](plan-review.md) for the comparison with the founding thesis.
-Foot's *Atomic Physics* (2005) is the primary physics reference; Thomas Walker provides
-the specialized cavity model. The [reference guide](physics-references.md)
-records the relevant sections and translates their conventions.
+The active application is `src/caipe_sim/yb171_simulator.py`. Phase 1b
+corrected atomic inputs and the signed hyperfine phase; its
+[results report](phase1b-physics-review.md) records the numerical effects.
+Amplitude and decay conventions were preserved. This remains an exploratory
+model: the tests establish numerical invariants and limiting cases, not a
+completed photon-generation performance or calibration study.
+
+Foot's *Atomic Physics* (2005) is the primary physics textbook; Thomas
+Walker's *Single Photons from a Trapped-Ion Cavity-QED System* (2020)
+supplies the specialized cavity model. The
+[reference guide](physics-references.md) records atomic sources, source
+precision, and metadata qualifications. See also the
+[plan review](plan-review.md).
 
 The DP pulse is the **D3/2→P1/2 reset coupling (simplified stand-in for the
 935 nm repump via 3D[3/2]1/2)**. It directly couples the existing D and P

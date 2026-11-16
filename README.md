@@ -20,6 +20,10 @@ sections, the Walker cavity model, and the separately verified Yb inputs.
 
 ![Yb-171 CPU demonstration](docs/images/yb171_demo.png)
 
+This checked-in illustration predates the Phase 1b atomic corrections. Run
+`uv run caipe-sim --demo` for current dynamics and reset-coupling labels;
+figure replacement remains part of the later portfolio cleanup.
+
 ## Run the demonstration
 
 Python 3.12 or newer is required. From this checkout, using uv:
