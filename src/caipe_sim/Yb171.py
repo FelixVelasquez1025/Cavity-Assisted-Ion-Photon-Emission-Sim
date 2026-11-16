@@ -61,7 +61,7 @@ I = 0.5
 # Hyperfine splittings frequencies (Straight from diagram)
 nu_S12 =   12.64e9   # F=1 <-> F=0  (6s 2S1/2)
 nu_P12 =   2.11e9    # F=1 <-> F=0  (6p 2P1/2)
-nu_D32 =   0.86e9    # F=2 <-> F=1  (5d 2D3/2)
+nu_D32 =   0.86375e9    # F=2 <-> F=1  (5d 2D3/2)
 nu_D3212 = 2.21e9    # F=0 <-> F=1  (3D[3/2]1/2)
 
 

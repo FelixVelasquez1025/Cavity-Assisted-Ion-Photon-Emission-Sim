@@ -88,7 +88,7 @@ I_NUCLEAR = 0.5  # Yb-171 nuclear spin
 HFS_A_GHZ = {
   'S': 12.642812118466,  # plus quadratic Zeeman term noted below
   'P': 2.105,
-  'D': 0.86372,
+  'D': 0.86375,
 }
 
 # values for electron spin g-factor (G_S), orbital g-factor (G_L), and nuclear spin factor (G_I) all from (https://arxiv.org/pdf/2509.04416)

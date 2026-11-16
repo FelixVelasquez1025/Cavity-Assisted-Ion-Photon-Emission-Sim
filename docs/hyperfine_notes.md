@@ -3,7 +3,7 @@
 ## Constants (energies at B=0 unless stated)
 - 2S1/2: A = 12.642812118466 GHz, plus quadratic Zeeman correction +310.6 Hz · B² (B in gauss). No B term; S1/2 has no electric quadrupole (B constant).
 - 2P1/2: A = 2.105 GHz. (B = 0 for P1/2.)
-- 2D3/2: A = 0.86372 GHz. (B typically small/neglected for D3/2 here.)
+- 2D3/2: A = 0.86375 GHz. (B typically small/neglected for D3/2 here.)
 
 ## Basis (implemented in code)
 - Full 16-state hyperfine ordering:
