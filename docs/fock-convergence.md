@@ -7,15 +7,15 @@ maximum absolute difference between dimensions 3 and 4 must be below 1e-3.
 **The condition fails, so the default remains 2.** All figures use this
 same default. This is an illustrative model, not a converged emission study.
 
-Measured at the start of Phase 1c, before the wavelength refinements, with
+Measured after the Phase 1c NIST and 369 nm wavelength refinements, with
 QuTiP 5.2.0 and 201 samples from 0 to 2 microseconds:
 
 | Observable | max abs(2 - 3) | max abs(3 - 4) |
 | --- | --- | --- |
-| P_S | 0.00236851929328 | 0.000225446410837 |
-| P_P | 0.00734178682857 | 0.00214173258909 |
-| P_D | 0.00863983443916 | 0.00223070870496 |
-| N_left | 0.00875758113188 | 0.00147267381391 |
+| P_S | 0.0023708679657 | 0.000225433529746 |
+| P_P | 0.0073434450683 | 0.00214468824286 |
+| P_D | 0.00864233158656 | 0.00223388488984 |
+| N_left | 0.00876353718433 | 0.00147452473536 |
 | N_right | 0 | 0 |
 
 Source: executed [comparison script](../scripts/check_fock_truncation.py),

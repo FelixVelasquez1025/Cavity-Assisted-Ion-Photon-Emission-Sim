@@ -43,8 +43,9 @@ calibration or photon-generation performance study.
 
 - **No diagonal hyperfine splittings.** The F,mF states and angular weights
   are present, but `HFS_A_GHZ` and metadata `Ahfs` do not enter the active
-  diagonal energies. The stored D value also needs an A-versus-splitting,
-  sign, and source-precision decision before it can be used there.
+  diagonal energies. D metadata now distinguishes the splitting from A/h=0.431875 GHz;
+  the adopted splitting precision and level-ordering convention still need
+  experimental justification before diagonal energies are added.
 - **No P1/2 Zeeman Hamiltonian.** Only S and D receive linear `g_F*mF*B`
   terms. The P g_F formula is now tested, but its energy shifts are not
   applied. No field-induced hyperfine mixing or quadratic Zeeman term is
@@ -63,17 +64,21 @@ calibration or photon-generation performance study.
   controls S/D projector dephasing, not a radiative D→S decay channel.
 - **Truncation sensitivity is measurable.** The default demo has two Fock
   states per mode. Increasing this to three changes a manifold population
-  by as much as 0.00863983443916 for the current pulse sequence; see the
+  by as much as 0.00864233158656 for the current pulse sequence; see the
   [executed comparison](fock-convergence.md). This is not a convergence proof.
 - **Current correlations are fluorescence diagnostics.** They use an SP
   atomic transition operator and the final state with a static Hamiltonian,
   not pulse-resolved cavity-output correlations. Intracavity photon number
   is not itself an output probability. No polarization-entanglement claim
   is established by the present calculations.
-- **UI configuration discrepancy.** `params['system']` starts as pi, but the
-  radio selector starts at left and determines the actual initial solve.
-  Zero default cavity coupling still disables cavity exchange. This existing
-  discrepancy is reported, not changed in Phase 1b.
+- **Truncation decision:** dimension 3 versus 4 exceeds 1e-3 in both a
+  population and photon number, so the default remains 2. Figures and the
+  analytic validation helper share `DEFAULT_FOCK_DIMENSION`.
+
+The UI dictionary and radio selector now both start at left, with cavity
+coupling 0.5 MHz and loss input 0.1 MHz, matching the demo. The UI retains
+its separate magnetic field and pulse defaults.
+
 
 ## What adding P1/2 Zeeman shifts would involve (not implemented)
 
@@ -124,7 +129,8 @@ must not be treated as the same solver.
 ## Next steps (outside Phase 1b)
 
 1. Map the rotating-frame detunings to specific Yb hyperfine transitions;
-   resolve the stored D metadata before adding splittings or P Zeeman terms.
+   document the remaining source precision and level ordering before adding
+   diagonal splittings or P Zeeman terms.
 2. Decide and implement simultaneous two-polarization coupling if required
    by the protocol. Walker adds `H_a + H_b` in Eqs. 2.4.14–2.4.15.
 3. Separate useful output transmission from other losses; evaluate
@@ -143,12 +149,14 @@ Full source definitions are in [physics-references.md](physics-references.md).
 
 ## Software boundaries
 
-`hamiltonian_utils.py`, `interactive_ui.py`, and the batch modules are older
-parallel implementations, not the active CLI backend. Their duplicate
-wavelength, lifetime, branching, and phase entries were corrected where
-requested, but this does not make their Hamiltonian or amplitude conventions
-equivalent. Batch sweeps still need to move to the pulse-enabled backend.
-JAX is optional for historical experiments; the active application uses CPU
-QuTiP. Default test collection is `tests/portfolio/`; historical tests under
-`tests/tests/` and `caipe_sim/` are excluded. Archival and the README landing
-page rewrite remain Steps 2–7, pending the user's go-ahead.
+The older Hamiltonian, UI, batch and three-level modules, examples, tests
+and notebooks are in [archive/](../archive/README.md), excluded from the
+installed package and CI. The active package imports none of these modules
+or their `_clebsch_gordan` helper; an AST import-boundary test enforces this.
+The active module still defines a separate local helper for its older
+bosonic path. The default hyperfine path uses signed Wigner 3j/6j factors
+directly; the historical/bosonic helper was not silently corrected.
+
+The CLI, demo and validation use CPU QuTiP. Current tests live in
+[tests/portfolio/](../tests/portfolio/). The default is illustrative and not
+a precision calibration recommendation. See the [review report](portfolio-review.md).
