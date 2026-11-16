@@ -18,7 +18,7 @@ from sympy import S as _S
 from sympy.physics.wigner import wigner_3j as _sympy_wigner_3j
 from sympy.physics.wigner import wigner_6j as _sympy_wigner_6j
 
-from .Yb171 import Yb171
+from caipe_sim.Yb171 import Yb171
 
 # ---------------------------------------------------------------------------
 # Constants and level metadata

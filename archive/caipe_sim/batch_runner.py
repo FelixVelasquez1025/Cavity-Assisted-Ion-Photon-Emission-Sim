@@ -32,10 +32,10 @@ if __package__ in (None, ""):
     if str(repo_root) not in sys.path:
         sys.path.insert(0, str(repo_root))
 
-import caipe_sim.interactive_ui as interactive_ui
+import archive.caipe_sim.interactive_ui as interactive_ui
 interactive_ui.USE_JAX_BACKEND = False  # hard-disable JAX for batch runs
 
-from caipe_sim.interactive_ui import (
+from archive.caipe_sim.interactive_ui import (
     build_collapse_operators,
     enable_jax_backend_if_available,
     hf_state_index,
@@ -43,7 +43,7 @@ from caipe_sim.interactive_ui import (
     projector_for_level_hf,
     solver_options,
 )
-from caipe_sim.hamiltonian_utils import (
+from archive.caipe_sim.hamiltonian_utils import (
     HF_BASIS_DIM,
     E1_DATA_HF,
     add_bare_terms_to_systems,

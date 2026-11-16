@@ -1,6 +1,6 @@
 import unittest
 import numpy as np
-from caipe_sim.three_level_model import sweep_kappa, sweep_gamma
+from archive.caipe_sim.three_level_model import sweep_kappa, sweep_gamma
 
 
 class TestSweepFunctions(unittest.TestCase):

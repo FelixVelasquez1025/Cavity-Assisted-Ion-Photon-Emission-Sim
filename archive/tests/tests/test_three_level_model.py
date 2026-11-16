@@ -1,7 +1,7 @@
 import unittest
 import numpy as np
-from caipe_sim.three_level_model import run_sim
-from caipe_sim.three_level_model import sweep_parameters
+from archive.caipe_sim.three_level_model import run_sim
+from archive.caipe_sim.three_level_model import sweep_parameters
 
 
 class TestThreeLevelSimulation(unittest.TestCase):

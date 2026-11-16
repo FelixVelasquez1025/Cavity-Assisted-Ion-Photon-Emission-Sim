@@ -14,13 +14,7 @@ dependencies = [
     "qutip>=5.2.0,<6",
     "scipy>=1.16",
     "sympy>=1.14.0",
-    "tqdm>=4.67.1",
 ]
-
-[project.optional-dependencies]
-jax = ["diffrax>=0.7.0", "jax>=0.8.1", "qutip-jax>=0.1.1"]
-notebooks = ["jupyter>=1.1.1"]
-legacy-atomic = ["atomic-physics>=2.0.5"]
 
 [project.scripts]
 caipe-sim = "caipe_sim.app_main:main"
@@ -33,3 +27,4 @@ packages = ["src/caipe_sim"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests/portfolio"]
+norecursedirs = ["archive", ".git", ".venv", "build", "dist"]
