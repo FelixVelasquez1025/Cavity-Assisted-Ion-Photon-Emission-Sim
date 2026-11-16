@@ -217,3 +217,7 @@ __marimo__/
 
 # Simulation output belongs outside the source package
 outputs/
+
+# Reproducible generated data and optional UI cache
+*.npz
+src/caipe_sim/precomputed_runs.csv

@@ -28,3 +28,6 @@ packages = ["src/caipe_sim"]
 [tool.pytest.ini_options]
 testpaths = ["tests/portfolio"]
 norecursedirs = ["archive", ".git", ".venv", "build", "dist"]
+
+[tool.hatch.build.targets.sdist]
+exclude = ["/archive"]
