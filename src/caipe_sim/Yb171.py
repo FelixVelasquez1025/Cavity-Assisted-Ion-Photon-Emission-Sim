@@ -41,8 +41,8 @@ tau_D32   = 52.7e-3       # 5d 2D3/2
 tau_D3212  = 37.7e-9      # 3D[3/2]1/2  
 
 # Branching ratios        (Straight from diagram)
-BR_P12_to_S12 = 0.995
-BR_P12_to_D32 = 0.005
+BR_P12_to_S12 = 1.0 - 0.00501
+BR_P12_to_D32 = 0.00501
 
 # Einstein A coefficients for each transition (Using formula: A = 1/tau * (branching ratio)  )
 A_P12_total   = 1.0 / tau_P12                 
