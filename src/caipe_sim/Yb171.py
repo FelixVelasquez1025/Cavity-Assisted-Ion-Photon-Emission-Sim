@@ -62,7 +62,7 @@ I = 0.5
 nu_S12 =   12.64e9   # F=1 <-> F=0  (6s 2S1/2)
 nu_P12 =   2.11e9    # F=1 <-> F=0  (6p 2P1/2)
 nu_D32 =   0.86375e9    # F=2 <-> F=1  (5d 2D3/2)
-nu_D3212 = 2.21e9    # F=0 <-> F=1  (3D[3/2]1/2)
+nu_D3212 = 2.2095e9    # F=0 <-> F=1  (3D[3/2]1/2)
 
 
 def lande_g_factor(level: Level) -> float:
@@ -91,7 +91,7 @@ class Yb171Factory:
     S12: Level = Level(n=6, S=1 / 2, L=0, J=1 / 2)
     P12: Level = Level(n=6, S=1 / 2, L=1, J=1 / 2)
     D32: Level = Level(n=5, S=1 / 2, L=2, J=3 / 2)
-    D3212: Level = Level(n=5, S=1 / 2, L=2, J=5 / 2)
+    D3212: Level = Level(n=5, S=1 / 2, L=2, J=1 / 2)
 
     ground_level: Level = S12
     shelf: Level = D3212
