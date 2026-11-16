@@ -1167,14 +1167,14 @@ def interactive_populations():
     gamma_SP=0.01,     # MHz
     gamma_DP=0.01,     # MHz
     gamma_SD=0.000136,  # MHz (136 Hz) dephasing placeholder
-    kappa_MHz=0.0,
+    kappa_MHz=0.1,
     # Defaults tuned to show hyperfine dynamics immediately.
     tmax_us=20.0,
     density=40.0, # samples per microsecond (high to resolve a few MHz drive)
-    system='pi',
+    system='left',
     is_bosonic=False,  # start in hyperfine mode
     use_cache=False,
-    g_cav_MHz=0.0,  # disable cavity for clarity
+    g_cav_MHz=0.5,  # match the illustrative demo cavity input
     # Moderate drive/reset coupling that can be resolved with the chosen density
     amp_driv_MHz=5.0, # driving laser amplitude E0 (MHz)
     amp_rep_MHz=3.0,  # simplified DP reset amplitude input (MHz)
@@ -1444,7 +1444,8 @@ def interactive_populations():
   s_rep_sigma = Slider(ax_rep_sigma, 'reset σ (us)', 0.05, params['tmax_us'], valinit=params['rep_sigma_us'])
 
   ax_sys = plt.axes([0.82, 0.08, 0.15, 0.12], facecolor=axcolor)
-  rb_sys = RadioButtons(ax_sys, ('left', 'pi', 'right'), active=0)
+  rb_sys = RadioButtons(ax_sys, ('left', 'pi', 'right'),
+                        active=('left', 'pi', 'right').index(params['system']))
 
   # Initial compute and line setup (after controls exist)
   t, res, taulist, g1_tau, g2_tau = build_and_solve(compute_correlations=False)
