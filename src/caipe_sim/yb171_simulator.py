@@ -104,7 +104,7 @@ TAU_P12 = 8.12e-9       # 6p 2P1/2
 TAU_D32 = 52.7e-3       # 5d 2D3/2
 BR_P12_TO_S12 = 1.0 - 0.00501
 BR_P12_TO_D32 = 0.00501
-OMEGA_369 = 2 * np.pi * consts.c / 369.5262e-9   # P1/2 <-> S1/2
+OMEGA_369 = 2 * np.pi * consts.c / 369.52604e-9   # P1/2 <-> S1/2
 OMEGA_2438 = 2 * np.pi * consts.c / 2.438e-6     # P1/2 <-> D3/2
 OMEGA_435 = 2 * np.pi * consts.c / 435.5e-9      # D3/2 <-> S1/2
 

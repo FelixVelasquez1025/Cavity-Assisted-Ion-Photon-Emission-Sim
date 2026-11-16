@@ -19,7 +19,7 @@ this simulator does not propagate those uncertainties.
 
 | Input | Adopted value | Published source / interpretation |
 | --- | --- | --- |
-| S1/2–P1/2 wavelength | 369.5262 nm | McLoughlin et al., [PRA 83, 013406 (2011)](https://doi.org/10.1103/PhysRevA.83.013406); [author manuscript](https://arxiv.org/abs/1007.4010). Retained project input. Table III instead reports 369.52604(6) nm for S(F=1)–P(F=0); the existing 369.5262 nm value was not changed without authorization. It is not the paper's exact central value or an implemented hyperfine detuning definition. |
+| S1/2–P1/2 wavelength | 369.52604 nm (vacuum) | McLoughlin et al., [PRA 83, 013406 (2011)](https://doi.org/10.1103/PhysRevA.83.013406), Table III: S1/2(F=1) ↔ P1/2(F=0) of 171Yb+, 369.52604(6) nm. The wavelength is a vacuum measurement; it is used for the reduced-element frequency, not as a completed hyperfine-resolved detuning map. |
 | D3/2–P1/2 wavelength | 2.438 µm | Project-adopted value requested in Phase 1b; McLoughlin et al., [PRA 83, 013406 (2011)](https://doi.org/10.1103/PhysRevA.83.013406), for the level scheme and optical spectroscopy context. This paper measures S–P and the 935 nm line, not a direct precision measurement of this DP line; the precise DP attribution remains to be established. |
 | S1/2–D3/2 wavelength | 435.5 nm | Rounded, unused E2 metadata; [PRA 83, 013406 (2011)](https://doi.org/10.1103/PhysRevA.83.013406) is the user-specified wavelength reference. A direct E2 wavelength source at the retained precision is still needed; no E1 element is computed from it. |
 | P1/2 lifetime | 8.12(2) ns; code uses central value | Olmschenk et al., [PRA 80, 022502 (2009)](https://doi.org/10.1103/PhysRevA.80.022502), _Measurement of the lifetime of the 6p 2P1/2 level of Yb+_. |
