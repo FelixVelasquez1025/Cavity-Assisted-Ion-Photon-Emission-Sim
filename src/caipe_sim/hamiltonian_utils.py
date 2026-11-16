@@ -76,10 +76,6 @@ g_s = _g_factor_for_level(Yb171.S12)
 g_d = _g_factor_for_level(Yb171.D32)
 g_p = _g_factor_for_level(Yb171.P12)
 
-# Reference linewidths (2π × MHz or mHz) converted to rad/s.
-LINEWIDTH_SP = 2 * np.pi * 21.57e6  # S1/2 ↔ P1/2
-LINEWIDTH_DP = 2 * np.pi * 1.482e6  # D3/2 ↔ P1/2 (852 nm)
-LINEWIDTH_SD = 2 * np.pi * 136e3  # S1/2 ↔ D3/2 (136 mHz → 136 kHz)
 
 # ---------------------------------------------------------------------------
 # Angular momentum helpers
@@ -719,9 +715,6 @@ __all__ = [
     "g_s",
     "g_d",
     "g_p",
-    "LINEWIDTH_SP",
-    "LINEWIDTH_DP",
-    "LINEWIDTH_SD",
     "wigner_3j",
     "wigner_6j",
     "_clebsch_gordan",
