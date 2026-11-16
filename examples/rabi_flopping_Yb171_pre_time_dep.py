@@ -1,3 +1,10 @@
+"""Historical Yb development example, not the active packaged solver.
+
+The D3/2→P1/2 reset coupling is a simplified stand-in for the 935 nm
+repump via 3D[3/2]1/2. It directly drives the adopted 2.438 µm DP line.
+Atomic sources and qualifications: docs/physics-references.md.
+"""
+
 from __future__ import annotations
 import math
 from typing import Dict, List, Tuple, Callable
@@ -408,7 +415,7 @@ def _rme_eq54(beta: float, omega: float, tau: float, Je: float) -> float:
   return math.sqrt(num / denom)
 
 
-# Compute published-input reduced dipole matrix elements (C·m) from diagram parameters
+# Reduced E1 elements from published/adopted inputs; see physics-references.md.
 REDUCED_E1_ELEMENTS = {
   "2S12_to_2P12": _rme_eq54(BR_P12_TO_S12, OMEGA_369, TAU_P12, Je=0.5)/_EA0,
   "2D32_to_2P12": _rme_eq54(BR_P12_TO_D32, OMEGA_2438, TAU_P12, Je=0.5)/_EA0,
@@ -423,11 +430,11 @@ def rabi_frequencies(E0_driv: float, E0_rep: float) -> Tuple[float, float]:
 
   Uses Eq. 2.1.8 with ħ = 1. The polarization geometry factor (ε·d)
   is handled by the Clebsch-Gordan structure inside the sigma operators
-  built in this module, so here Ω = E0 in rad/s.
+  built in this module, the helper returns E0/2; each builder multiplies by coeff/2.
 
   Parameters
   - E0_driv: driving laser field amplitude (rad/s scale)
-  - E0_rep: repump laser field amplitude (rad/s scale)
+  - E0_rep: simplified DP reset amplitude input (rad/s scale)
   """
   return float(E0_driv)/(2*HBAR), float(E0_rep)/(2*HBAR)
 
@@ -443,7 +450,7 @@ def omega_drive(t: float, args: Dict[str, float]) -> float:
 
 
 def omega_rep(t: float, args: Dict[str, float]) -> float:
-  """Gaussian repump envelope Ω_rep(t)."""
+  """Gaussian simplified D3/2→P1/2 reset envelope; not a 935 nm pathway."""
   amp = float(args.get("rep_amp", 0.0))
   t0 = float(args.get("rep_t0", 0.0))
   sigma = float(args.get("rep_sigma", 0.0))
@@ -826,7 +833,7 @@ def H_laser_systems_from_E0(E0_driv: float, E0_rep: float, dim: int = 8, e1_coef
   """Laser Hamiltonians using field amplitudes E0 (rad/s scale).
 
   Implements Eq. 2.1.8 with ħ = 1 and the polarization geometry handled by
-  CGCs in the sigma terms; we therefore pass Ω = E0 to _build_systems, which
+  CGCs in the sigma terms; we pass E0/2 to _build_systems, which
   already applies the 1/2 prefactor internally.
   """
   Omega_driv, Omega_rep = rabi_frequencies(E0_driv, E0_rep)
@@ -1293,9 +1300,9 @@ def interactive_populations():
     is_bosonic=False,  # start in hyperfine mode
     use_cache=False,
     g_cav_MHz=0.0,  # disable cavity for clarity
-    # Moderate drive/repump that can be resolved with the chosen density
+    # Moderate drive/reset coupling that can be resolved with the chosen density
     amp_driv_MHz=5.0, # driving laser amplitude E0 (MHz)
-    amp_rep_MHz=3.0,  # repump laser amplitude E0 (MHz)
+    amp_rep_MHz=3.0,  # simplified DP reset amplitude input (MHz)
     drive_t0_us=5.0,
     drive_sigma_us=1.0,
     rep_t0_us=5.0,
@@ -1521,13 +1528,13 @@ def interactive_populations():
   s_BG  = Slider(ax_BG,  'B (G)',    0.0, 50.0, valinit=params['B_G'])
   s_tmax = Slider(ax_tmax, 't_max (us)', 5.0, 200.0, valinit=params['tmax_us'])
   s_ddrv = Slider(ax_ddrv, 'Δ_driv (MHz)', -3.0, 3.0, valinit=params['delta_drive_MHz'])
-  s_drep = Slider(ax_drep, 'Δ_rep (MHz)', -3.0, 3.0, valinit=params['delta_rep_MHz'])
+  s_drep = Slider(ax_drep, 'Δ_reset (MHz)', -3.0, 3.0, valinit=params['delta_rep_MHz'])
   s_dcav = Slider(ax_dcav, 'Δ_c (MHz)',  -3.0, 3.0, valinit=params['delta_c_MHz'])
 
   s_dense= Slider(ax_dense,'samples/us', 1.0, 100.0, valinit=params['density'])
   s_gcav = Slider(ax_gcav, 'g_cav (MHz)', 0.0, 50.0, valinit=params.get('g_cav_MHz', 0.0))
   s_ampdrv = Slider(ax_ampdrv, 'Ω_drive (MHz)', -30.0, 30.0, valinit=params['amp_driv_MHz'])
-  s_amprep = Slider(ax_amprep, 'Ω_rep (MHz)', -30.0, 30.0, valinit=params['amp_rep_MHz'])
+  s_amprep = Slider(ax_amprep, 'Reset A (MHz)', -30.0, 30.0, valinit=params['amp_rep_MHz'])
   s_taumax = Slider(ax_taumax, 'τ_max (us)', 0.05, 10.0, valinit=params['tau_max_us'])
   s_gamma_sp = Slider(ax_gammasp, 'γ_SP', 0.0, 1.0, valinit=params['gamma_SP'])
   s_gamma_dp = Slider(ax_gammadp, 'γ_DP', 0.0, 1.0, valinit=params['gamma_DP'])
@@ -1653,7 +1660,7 @@ def interactive_populations():
 
 
 def pulse_example() -> None:
-  """Minimal example: run a Gaussian-pulsed drive/repump simulation."""
+  """Minimal example: Gaussian drive and simplified DP reset coupling."""
   params = {
     "B_G": 5.0,
     "delta_drive_MHz": 0.0,

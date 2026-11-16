@@ -301,7 +301,7 @@ def _rme_eq54(beta: float, omega: float, tau: float, Je: float) -> float:
   return math.sqrt(num / denom)
 
 
-# Compute published-input reduced dipole matrix elements (C·m) from diagram parameters
+# Reduced E1 elements from published/adopted inputs; see physics-references.md.
 REDUCED_E1_ELEMENTS = {
   "2S12_to_2P12": _rme_eq54(BR_P12_TO_S12, OMEGA_369, TAU_P12, Je=0.5)/_EA0,
   "2D32_to_2P12": _rme_eq54(BR_P12_TO_D32, OMEGA_2438, TAU_P12, Je=0.5)/_EA0,
