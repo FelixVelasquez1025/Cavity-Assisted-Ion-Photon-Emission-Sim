@@ -28,7 +28,7 @@ def test_every_decay_sublevel_normalizes(upper_level):
         assert out[a.INDEX[upper], a.INDEX[upper]].real == pytest.approx(1/a.MANIFOLDS[upper_level].lifetime_s, rel=1e-10)
 
 
-@pytest.mark.parametrize("level,F,expected", [("S",1,1.4),("P",1,.47),("D",1,1.4),("D",2,.84), ("A",1,.923402946317)])
+@pytest.mark.parametrize("level,F,expected", [("S",1,1.4),("P",1,.47),("D",1,1.4),("D",2,.84), ("A",1,.9234)])
 def test_all_zeeman_slopes(level, F, expected):
     # Foot §6.3, with NIST ASD gJ=1.320 for A; do NOT apply LS to A.
     h = a.internal_hamiltonian(1).full()-a.internal_hamiltonian(0).full()
@@ -53,3 +53,25 @@ def test_e1_coefficients_reuse_validated_convention():
 def test_optional_clock_quadratic_shift():
     delta = (a.internal_hamiltonian(5, clock_quadratic=True)-a.internal_hamiltonian(5)).diag()
     assert (delta[a.INDEX["S",1,0]]-delta[a.INDEX["S",0,0]])/(2*np.pi) == pytest.approx(310.8*25)
+
+
+def test_rank_two_decay_and_hyperfine_branch_weights():
+    # Rank-2 Racah formula: <D F2,m0|Q_0|S F0,m0>/RME=1/sqrt(10).
+    assert a.coefficient(('S',0,0),('D',2,0),2) == pytest.approx(1/np.sqrt(10))
+    for upper, lower_level, expected_fractions in [
+        (('D',1,0),'S',{0:0,1:1}),
+        (('D',2,0),'S',{0:.4,1:.6}),
+        (('A',1,0),'S',{0:1/3,1:2/3}),
+        (('A',1,0),'D',{1:1/6,2:5/6}),
+    ]:
+        channels = [(l,r) for u,l,r in a.decay_channels() if u==upper and l[0]==lower_level]
+        total = sum(r for _,r in channels)
+        for F, expected in expected_fractions.items():
+            assert sum(r for l,r in channels if l[1]==F)/total == pytest.approx(expected)
+
+
+def test_auxiliary_gj_is_tabulated_not_ls():
+    from scipy.constants import h, physical_constants
+    assert a.MANIFOLDS['A'].g_j == 1.320  # NIST ASD, accessed 2026-11-18.
+    expected = (1.320-.0005362)/2 * physical_constants['Bohr magneton'][0]/h * 1e-10
+    assert a.g_f('A',1)*a.MU_B_OVER_HBAR*1e-4/(2*np.pi*1e6) == pytest.approx(expected,rel=1e-12)

@@ -106,8 +106,13 @@ class FreeSpaceModel:
         generator = liouvillian(self.hamiltonian, self.collapses).full()
         vector = rho.full().reshape(-1, order="F")
         states, previous, propagators = [], 0.0, {}
+        steps = np.diff(times)
+        uniform_step = (float(steps[0]) if len(steps) and steps[0] > 0
+                        and np.allclose(steps, steps[0], rtol=1e-12, atol=0) else None)
         for t in times:
-            dt = float(t-previous)
+            # linspace intervals differ by roundoff: reuse one exact uniform
+            # step rather than exponentiating the same generator repeatedly.
+            dt = uniform_step if uniform_step is not None and previous != 0 else float(t-previous)
             if dt:
                 if dt not in propagators:
                     propagators[dt] = expm(generator*dt)
@@ -191,7 +196,10 @@ def build_model(beams=(), *, B_gauss=0.0, clock_quadratic=False) -> FreeSpaceMod
             upper = PAIRS[beam.line][1]
             projector = sum(a.ket(*s).proj() for s in a.STATES if s[0] == upper)
             collapses.append(np.sqrt(2*beam.linewidth_dephasing_s)*projector)
-    return FreeSpaceModel(h, collapses, omitted, assignments)
+    # These selection-rule operators are sparse. Keeping them sparse avoids
+    # dense 400x400 matrix products at every full-reference integration step.
+    return FreeSpaceModel(h.to("csr"), [c.to("csr") for c in collapses],
+                          [(op.to("csr"), beat) for op, beat in omitted], assignments)
 
 
 def fluorescence_369_s(rho):

@@ -57,7 +57,8 @@ centroid does not remove the observable F-level differences.
 ## Magnetic field and the optional clock correction
 
 A weak field defines the z quantization axis and separates magnetic
-sublevels. It also prevents population remaining in coherent combinations
+sublevels. Dark-state destabilization follows the mechanism discussed by
+Berkeland and Boshier, [PRA 65, 033413 (2002)](https://doi.org/10.1103/PhysRevA.65.033413). It also prevents population remaining in coherent combinations
 that the detection light cannot excite. The linear shift is
 
 \[
@@ -243,3 +244,132 @@ or detector counts. This internal-state model can describe the fluorescence
 used for Doppler cooling, but has no velocity or temperature and cannot
 predict the cooling limit itself. Stage 1b's collection, counting statistics
 and experimental benchmarks are not implemented here.
+
+## What the weak-probe spectrum measures
+
+A fully pumped steady state is the wrong way to locate all optical lines:
+a weak resonant beam can eventually pump its own starting population out of
+the addressed F manifold or into a coherent dark state. Instead the scan
+holds the initial ground populations fixed and evaluates the leading-order
+optical susceptibility. For an incoherent uniform mixture in a selected S F,
+
+\[
+R_{369}(\Delta)=\sum_{\ell,u}p_\ell
+\frac{\Gamma_{PS}|(H/\hbar)_{u\ell}|^2}
+{(\Gamma_P/2)^2+(\omega_{u\ell}-\omega_L)^2}.
+\]
+
+This comes from solving the linear optical-coherence equation at fixed
+ground population. It is valid after coherence settles but before appreciable
+optical pumping, for Rabi frequencies much smaller than the natural width.
+The code takes its matrix elements and detunings from the actual single-tone
+Hamiltonian. The scan combines a coarse full range with 0.1 MHz sampling
+near the lines. It is also corroborated with full 100 ns master-equation
+weak pulses at the three resonances and at ±80 MHz: all three on-resonance
+populations exceed either wing by more than 60×, while P population stays
+below 1.1×10⁻⁶. Thus the peak locations are not solely a check of a separately
+written Lorentzian formula.
+
+From S F=1 the two features lie at 0 and +2.105 GHz relative to detection.
+From S F=0 the allowed line is at +12.642812118466+2.105 GHz, or
++14.747812118466 GHz, which rounds to +14.748 GHz. S F=0→P F=0 is forbidden.
+These are optical frequency differences, not missing laser sidebands.
+
+## Reproducing the Stage 1a checks
+
+From the repository root:
+
+```bash
+uv run pytest
+uv run caipe-sim --demo
+uv run python scripts/check_spam_atomic.py --output outputs/spam-stage1a.json
+```
+
+The script creates only an optional machine-readable diagnostic report;
+it does not change defaults or run the Stage 1b benchmark sweep.
+`outputs/` remains ignored. Numerical results below were measured with
+Python 3.12.13, NumPy 2.3.1, SciPy 1.16.0 and QuTiP 5.2.0.
+
+| Check | Result | Scope |
+| --- | --- | --- |
+| Maximum relative total-decay normalization error | 2.22045×10⁻¹⁶ | Every P, A and D sublevel; individual branch sums also tested at relative 10⁻¹⁰ |
+| S F=1 Zeeman slope | 1.400872330 MHz/G per m | Linear weak-field model |
+| P F=1 Zeeman slope | 0.465622237 MHz/G per m | Includes actual P Hamiltonian term |
+| D F=1 Zeeman slope | 1.398993833 MHz/G per m | Includes actual D Hamiltonian term |
+| D F=2 Zeeman slope | 0.839096109 MHz/G per m | Includes actual D Hamiltonian term |
+| A F=1 Zeeman slope | 0.923376925 MHz/G per m | NIST g_J=1.320, projected with I=1/2; includes actual A term |
+| Probe P-line separation | 2.105 GHz | Initial weak-probe spectrum; not a pumped steady state |
+| Probe from S F=0 | +14.747812118466 GHz | Relative to the detection carrier |
+| Max sampled two-tone population difference | 6.05823×10⁻⁶ | 121 times across 0–30 ns, 369 carrier and +14.748 GHz tone |
+| Max sampled density-matrix Frobenius difference | 1.80873×10⁻⁴ | Includes coherences/micromotion omitted by secularization |
+| Max trace error through 1 ms | 2.78132×10⁻¹⁰ | Test times 0, 0.1 µs, 10 µs, 1 ms |
+| Max Hermiticity error through 1 ms | 9.56362×10⁻¹⁴ | Largest entrywise mismatch with ρ† |
+| Minimum density eigenvalue across those times | 0 | Includes the initial pure state; no negativity repair |
+| Minimum Choi eigenvalue of the 20 ns channel | +4.17261×10⁻¹³ | An additional finite-time complete-positivity check |
+
+The two-tone test starts in (|S,F=0,m=0⟩+|S,F=1,m=0⟩)/√2, with B=5 G,
+θ=0.7 rad and both reduced Ω/(2π)=5 MHz. These Rabi inputs and angle are
+illustrative, not a fit. The full integrator uses atol=10⁻¹¹, rtol=10⁻⁹,
+maximum step 1/(50×14.748 GHz)=1.35612 ps. Repeating at half that step gives
+6.05816×10⁻⁶ and 1.80873×10⁻⁴ respectively. The population-difference
+metric changes by 7.10×10⁻¹¹; the density-norm metric by 1.58×10⁻¹⁰.
+These are sampled maxima, not bounds between output times. Thirty ns is
+about 3.7 P lifetimes, not a detection-window convergence study.
+
+### Zero field versus 5 G
+
+For this check both beams have θ=55°, carrier Ω_red/(2π)=20 MHz, sideband
+Ω_red/(2π)=10 MHz, and zero carrier detuning. The 369 sideband is +14.748 GHz
+and the 935 sideband is −3.070 GHz. These strengths are **illustrative
+validation controls**. They are not Egan's measured intensities. Clock
+quadratic correction and laser dephasing are off. All physical decay channels
+remain active.
+
+| Magnetic field | Stationary emitted 369 nm photons/s |
+| --- | ---: |
+| 0 G | 851.431664 |
+| 5 G | 5,103,099.706775 |
+
+The ratio is 1.66846×10⁻⁴, about a 5994-fold suppression. The stationary
+Liouvillian residual norm is below 9×10⁻⁷ s⁻¹ in both cases, and both
+density matrices have nonnegative eigenvalues within numerical precision.
+The dominant S F=1→P F=0 coupling has a two-dimensional dark subspace at
+zero field: one row of couplings cannot couple three independent ground
+states. A test constructs a null vector. Off-resonant coupling to P F=1
+and the remaining repump dynamics weakly lift exact darkness, explaining
+the small nonzero fluorescence floor. The field splits m levels so the
+dark superposition evolves into combinations the laser can excite.
+This is a consistency check, not a magnetic-field/polarization optimization
+or a fit to Egan's apparatus.
+
+## Approximation inventory and unresolved questions
+
+- **Restricted internal basis:** only these 20 states; no F₇/₂ shelving,
+  P₃/₂, collisions, motional Doppler shifts, micromotion or recoil. The
+  model describes cooling-light fluorescence, not actual Doppler cooling.
+- **Weak field:** linear g_F shifts with fixed F basis, with an optional
+  clock-only B² correction. No full Breit–Rabi mixing or complete quadratic
+  Hamiltonian. S/P/D electronic LS factors are approximate; A is tabulated.
+- **Optical RWA and secular multitone approximation:** exact single-tone
+  static Hamiltonian including far-detuned transitions; additional beat
+  terms omitted only for multitone runs. Their micromotion and light shifts
+  are not captured. The 30 ns check does not certify small leakage rates
+  over 100 µs detection windows; that must be revisited for Stage 1b.
+- **Coherent ideal linear polarization:** fixed angles and relative phases,
+  with no default phase noise, amplitude noise or ellipticity. User Rabi
+  frequencies are not intensity-calibrated inputs. The optional pure
+  dephasing model is independent white phase noise per beam, not a complete
+  model of correlated carrier/sideband linewidth.
+- **Markovian resolved-channel vacuum bath:** angularly weighted, normalized
+  independent jumps. Cross-channel decay coherences at exact degeneracy
+  are ignored. D decay is E2 and is assumed to terminate entirely in S;
+  P and A each use only the two retained electronic branches.
+- **Adopted spectroscopy:** rounded sideband offsets need not be exactly
+  resonant. D splitting **UNVERIFIED precision** remains the only explicitly
+  unverified numeric input. Uncertainties of cited measurements and the
+  tabulated auxiliary g_J are not propagated.
+- **Validation scope:** the susceptibility assumes fixed initial ground
+  populations; full weak pulses corroborate its resonances. Numerical
+  positivity checks supplement, rather than replace, the Lindblad argument.
+  No SPAM fidelity, optimum angle, scattering-budget or detector histogram
+  is claimed. Those are Stage 1b work, which has not started.

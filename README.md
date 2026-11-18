@@ -80,6 +80,12 @@ Analytic Gaussian pulse-area comparison: maximum absolute population residual **
 
 Numerical checks, correction comparisons and their scope are in [validation notes](docs/validation-notes.md).
 
+A separate [free-space 20-state atomic model](docs/spam-physics-notes.md)
+provides the Stage 1a foundation for state preparation and measurement.
+It includes hyperfine energies, all-manifold Zeeman terms, 369/935 nm beams
+and normalized spontaneous decay; experimental SPAM benchmarks are pending.
+It leaves the cavity simulator unchanged.
+
 ## Quickstart
 
 With Python 3.12+ and uv installed:

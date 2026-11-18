@@ -26,15 +26,10 @@ def test_single_tone_static_and_off_resonant_leakage_retained():
 
 
 def test_secular_two_tone_against_full_time_dependent_reference():
-    beam = Beam("369", 2*np.pi*5e6, .7,
-                sidebands=(Tone(14.748e9,2*np.pi*5e6),))
-    model = build_model([beam], B_gauss=5)
-    times = np.linspace(0, 3e-9, 61)
-    initial = (a.ket("S",0,0)+a.ket("S",1,0)).unit()
-    secular = model.evolve(initial, times)
-    full = model.full_evolution(initial, times, max_step_s=1/(50*14.748e9))
-    difference = max(np.max(abs(x.diag()-y.diag())) for x,y in zip(secular,full))
-    assert difference < 1e-4
+    from caipe_sim.spam.validation import two_tone_comparison
+    report = two_tone_comparison()
+    assert report['max_population_difference'] < 1e-4
+    assert report['max_density_frobenius_difference'] < 1e-3
 
 
 def test_trace_hermiticity_and_positive_density_over_long_run():
@@ -54,3 +49,41 @@ def test_laser_dephasing_off_by_default_and_convention():
     assert len(extra.collapses) == len(base.collapses)+1
     c = extra.collapses[-1]
     assert c[a.INDEX['P',1,0], a.INDEX['P',1,0]] == pytest.approx(np.sqrt(200))
+
+
+def test_weak_probe_hyperfine_spectrum():
+    from caipe_sim.spam.validation import hyperfine_probe_check
+    report = hyperfine_probe_check()
+    assert report['S_F1_peak_detunings_hz'] == pytest.approx([0,2.105e9],abs=1e5)
+    assert report['P_peak_separation_hz'] == pytest.approx(2.105e9,abs=1e5)
+    assert report['S_F0_peak_detuning_hz'] == pytest.approx(14.747812118466e9,abs=1e5)
+
+
+def test_dark_subspace_and_zero_field_fluorescence_suppression():
+    from caipe_sim.spam.validation import dark_state_check
+    # Near-resonant S F1->P F0 row has rank one: two independent dark states.
+    model = build_model([Beam('369',2*np.pi*20e6,np.deg2rad(55))])
+    row = model.hamiltonian.full()[a.INDEX['P',0,0], [a.INDEX['S',1,m] for m in (-1,0,1)]]
+    _, singular, vh = np.linalg.svd(row.reshape(1,3))
+    assert singular[0] > 0
+    assert abs(row@vh[1].conj()) < 1e-8
+    report = dark_state_check()
+    # Full model's off-resonant P F1 excitation weakly lifts the darkness.
+    assert 0 < report['fluorescence_369_per_s']['0'] < 1e-3*report['fluorescence_369_per_s']['5']
+    assert max(report['stationary_residual_norm_per_s'].values()) < 1e-5
+    assert min(report['minimum_density_eigenvalues'].values()) > -1e-9
+
+
+def test_finite_time_channel_complete_positivity():
+    from caipe_sim.spam.validation import long_run_check
+    report = long_run_check()
+    assert report['minimum_choi_eigenvalue'] > -1e-8
+    assert report['choi_hermiticity_error'] < 1e-8
+
+
+def test_probe_resonances_also_appear_in_full_master_equation():
+    from caipe_sim.spam.validation import finite_weak_probe_check
+    for feature in finite_weak_probe_check():
+        left, peak, right = feature['P_population_after_100ns']
+        assert peak > 20*max(left,right)
+        assert peak < 1e-5  # Weak probe: ground depletion/pumping stays negligible.
