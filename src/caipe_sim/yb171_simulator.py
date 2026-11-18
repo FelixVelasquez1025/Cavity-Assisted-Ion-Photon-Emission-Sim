@@ -33,9 +33,10 @@ from qutip import correlation_2op_1t
 from qutip import correlation_3op_1t
 from scipy import constants as consts
 from caipe_sim.Yb171 import Yb171
-from sympy import S as _S
-from sympy.physics.wigner import wigner_3j as _sympy_wigner_3j
-from sympy.physics.wigner import wigner_6j as _sympy_wigner_6j
+# Public aliases preserve the existing angular-helper API.
+from .angular_momentum import (
+    wigner_3j, wigner_6j, hyperfine_angular_factor, hyperfine_matrix_coefficient,
+)
 
 
 #Timing functions 
@@ -260,21 +261,6 @@ def save_cache_entry(entry: dict) -> None:
     f.write(json.dumps(entry) + "\n")
 
 
-def wigner_3j(j1: float, j2: float, j3: float, m1: float, m2: float, m3: float) -> float:
-    """Numeric wrapper around SymPy wigner_3j returning a real float.
-
-    SymPy may return an exact algebraic (possibly complex) expression; we
-    evaluate numerically and return the real part, warning only if the
-    imaginary part is non-negligible.
-    """
-    val = _sympy_wigner_3j(_S(j1), _S(j2), _S(j3), _S(m1), _S(m2), _S(m3))
-    cval = complex(val.evalf())
-    if abs(cval.imag) > 1e-12:
-      # Wigner 3j for physical arguments should be real; keep real part.
-      pass
-    return float(cval.real)
-
-
 def _clebsch_gordan(j1: float, m1: float, j2: float, m2: float, J: float, M: float) -> float:
   """Compute a Clebsch-Gordan coefficient via Wigner-3j."""
   # Use integer parity for the phase to avoid complex results from float powers
@@ -287,23 +273,6 @@ def _clebsch_gordan(j1: float, m1: float, j2: float, m2: float, J: float, M: flo
   val = phase * math.sqrt(2.0 * J + 1.0) * w3_real
   return float(val)
 
-
-def wigner_6j(j1: float, j2: float, j3: float, j4: float, j5: float, j6: float) -> float:
-  """Numeric wrapper around SymPy wigner_6j returning a real float."""
-  val = _sympy_wigner_6j(_S(j1), _S(j2), _S(j3), _S(j4), _S(j5), _S(j6))
-  cval = complex(val.evalf())
-  if abs(cval.imag) > 1e-12:
-    pass
-  return float(cval.real)
-
-
-def hyperfine_angular_factor(Jp: float, Fp: float, J: float, F: float, I: float = 0.5) -> float:
-  """Angular factor for hyperfine-coupled fermionic isotopes (Eq. (2) in doc)."""
-  phase_exp = Jp + I + F + 1
-  phase = 1.0 if int(round(phase_exp)) % 2 == 0 else -1.0
-  prefac = math.sqrt((2 * Fp + 1) * (2 * F + 1))
-  sixj = wigner_6j(Jp, Fp, I, F, J, 1.0)
-  return phase * prefac * sixj
 
 def _rme_eq54(beta: float, omega: float, tau: float, Je: float) -> float:
   """Reduced matrix element via Eq. (54): sqrt((2Je+1) * 3π ε0 ħ c^3 β / (ω^3 τ))."""
@@ -353,10 +322,7 @@ def e1_matrix_element(
   else:
     if None in (Fp, F, mFp, mF):
       raise ValueError("Fermionic case requires Fp, F, mFp, mF.")
-    phase = (-1) ** (Fp - mFp)
-    three_j = wigner_3j(Fp, 1.0, F, -mFp, q, mF)
-    hf_factor = hyperfine_angular_factor(Jp, Fp, J, F, I=I)
-    return phase * three_j * hf_factor * reduced
+    return hyperfine_matrix_coefficient(Jp, Fp, mFp, J, F, mF, q, I=I) * reduced
 
 
 def hf_state_index(level: str, F: float, mF: float) -> int:

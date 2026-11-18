@@ -75,3 +75,12 @@ def test_auxiliary_gj_is_tabulated_not_ls():
     assert a.MANIFOLDS['A'].g_j == 1.320  # NIST ASD, accessed 2026-11-18.
     expected = (1.320-.0005362)/2 * physical_constants['Bohr magneton'][0]/h * 1e-10
     assert a.g_f('A',1)*a.MU_B_OVER_HBAR*1e-4/(2*np.pi*1e6) == pytest.approx(expected,rel=1e-12)
+
+
+def test_angular_helpers_have_one_shared_implementation():
+    from caipe_sim import angular_momentum as shared
+    from caipe_sim.spam import atomic
+    assert existing.wigner_3j is shared.wigner_3j
+    assert existing.wigner_6j is shared.wigner_6j
+    assert existing.hyperfine_angular_factor is shared.hyperfine_angular_factor
+    assert atomic.hyperfine_matrix_coefficient is shared.hyperfine_matrix_coefficient

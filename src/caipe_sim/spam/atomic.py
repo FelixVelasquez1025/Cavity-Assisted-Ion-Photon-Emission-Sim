@@ -9,13 +9,14 @@ import numpy as np
 from qutip import Qobj, basis
 from scipy.constants import hbar, physical_constants
 
-from caipe_sim import yb171_simulator as angular
+from caipe_sim import yb171_simulator as cavity
+from caipe_sim.angular_momentum import hyperfine_matrix_coefficient
 
 DIMENSION = 20
 I = 0.5  # Olmschenk et al., PRA 76, 052314 (2007), Sec. I.
 MU_B_OVER_HBAR = physical_constants["Bohr magneton"][0] / hbar
 # Signed, in Bohr-magneton units: arXiv:2509.04416, Eqs. 16–19.
-G_I = angular.G_I
+G_I = cavity.G_I
 SOURCES = {
     "S_hfs": "https://doi.org/10.1109/58.585119",
     "P_hfs": "https://doi.org/10.1103/PhysRevA.49.3351",
@@ -43,7 +44,7 @@ class Manifold:
 # S/P/D electronic g factors reuse the validated weak-field LS approximation
 # (Foot §§5.5, 6.3; magnetic constants arXiv:2509.04416). Not measured g_J.
 def _g_j(L, J):
-    return angular.lande_g_factors(1, I, J, L, .5)[0]
+    return cavity.lande_g_factors(1, I, J, L, .5)[0]
 
 
 MANIFOLDS = {
@@ -114,14 +115,9 @@ def coefficient(lower: tuple, upper: tuple, rank: int = 1) -> float:
     q = mp-m
     if abs(q) > rank or not abs(F-Fp) <= rank <= F+Fp:
         return 0.0
-    if rank == 1:
-        hf = angular.hyperfine_angular_factor(Jp, Fp, J, F, I)
-    elif rank == 2:
-        # General rank-k recoupling, Foot Ch. 6 / Steck Sec. 3.3.
-        hf = (-1)**int(Jp+I+F+rank)*np.sqrt((2*Fp+1)*(2*F+1))*angular.wigner_6j(Jp, Fp, I, F, J, rank)
-    else:
+    if rank not in (1, 2):
         raise ValueError("Only E1 and E2 are supported")
-    return (-1)**(Fp-mp)*angular.wigner_3j(Fp, rank, F, -mp, q, m)*hf
+    return hyperfine_matrix_coefficient(Jp, Fp, mp, J, F, m, q, I=I, rank=rank)
 
 
 @lru_cache(maxsize=None)

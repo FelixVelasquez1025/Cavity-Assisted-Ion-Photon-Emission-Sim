@@ -96,9 +96,10 @@ H_{u\ell}/\hbar=\frac{\Omega_{\rm red}}{2}
 \left\{\begin{matrix}J'&F'&I\\F&J&1\end{matrix}\right\}.
 \]
 
-Here q=m′−m. The 6j hyperfine factor and the 3j evaluation reuse the
-validated cavity functions; no second E1 recoupling implementation is
-introduced. The auxiliary state's electronic character affects its reduced
+Here q=m′−m. The complete angular coefficient is implemented once in
+`caipe_sim.angular_momentum`, shared by the cavity and free-space models.
+The existing signed 3j/6j reference tests still exercise that same code;
+no second E1 recoupling implementation is introduced. The auxiliary state's electronic character affects its reduced
 matrix element and g_J, not this angular-momentum projection law. There
 is no conversion from watts or s=I/I_sat and no inferred 935 nm dipole
 strength. This choice makes both beams usable without inventing those
@@ -285,6 +286,24 @@ uv run caipe-sim --demo
 uv run python scripts/check_spam_atomic.py --output outputs/spam-stage1a.json
 ```
 
+For a minimal programmable experiment (illustrative Rabi strength):
+
+```python
+import numpy as np
+from caipe_sim.spam.atomic import ket
+from caipe_sim.spam.model import Beam, build_model, fluorescence_369_s
+
+beam = Beam("369", rabi_rad_s=2*np.pi*1e6,
+            theta_rad=np.deg2rad(55), detuning_hz=0)
+model = build_model([beam], B_gauss=5)
+rho = model.evolve(ket("S", 1, 0), [0, 100e-9])[-1]
+print(fluorescence_369_s(rho))  # emitted photons/s at 100 ns
+```
+
+This example has no 935 beam or sidebands and is not a closed cooling cycle.
+Add a second `Beam("935", ...)` and explicit `Tone` objects for repumping;
+`validation_beams()` shows the complete parameters used for the checks.
+
 The script creates only an optional machine-readable diagnostic report;
 it does not change defaults or run the Stage 1b benchmark sweep.
 `outputs/` remains ignored. Numerical results below were measured with
@@ -373,3 +392,13 @@ or a fit to Egan's apparatus.
   positivity checks supplement, rather than replace, the Lindblad argument.
   No SPAM fidelity, optimum angle, scattering-budget or detector histogram
   is claimed. Those are Stage 1b work, which has not started.
+
+
+The shared angular-helper extraction preserves the cavity module's public
+helper names as aliases. Before/after checks found **exactly identical**
+cavity demo arrays and all compared S–P and D–P E1 coefficients. Cavity
+Hamiltonian terms, atomic inputs, pulse conventions, collapse construction,
+UI defaults and Fock truncation were not changed.
+
+Final Stage 1a verification: **46 tests passed**, including all 23 existing
+cavity/package tests; `uv run caipe-sim --demo` also passed.
