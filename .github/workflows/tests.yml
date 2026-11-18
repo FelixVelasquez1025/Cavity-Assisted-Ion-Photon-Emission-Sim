@@ -1,0 +1,32 @@
+name: CPU validation
+
+on: [push, pull_request]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install uv
+        run: python -m pip install uv
+      - name: Install the locked active package and tests
+        run: uv sync --locked
+      - name: Validate hyperfine and pulse dynamics
+        env:
+          MPLBACKEND: Agg
+        run: uv run pytest tests
+      - name: Export the CPU demo
+        run: uv run caipe-sim --demo
+      - name: Reproduce Rabi and demo figures
+        run: uv run python scripts/make_readme_figures.py
+      - name: Check Fock truncation sensitivity
+        run: uv run python scripts/check_fock_truncation.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: yb171-demo
+          path: |
+            outputs/
+            docs/figures/

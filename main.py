@@ -1,5 +1,6 @@
-def main():
-    print("Hello from caipe-sim!")
+"""Launch CAIPE-sim from an installed checkout."""
+
+from caipe_sim.app_main import main
 
 
 if __name__ == "__main__":

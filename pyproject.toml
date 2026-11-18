@@ -1,16 +1,33 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
 [project]
 name = "caipe-sim"
 version = "0.1.0"
-description = "Add your description here"
+description = "Yb-171 ion-cavity dynamics with hyperfine couplings and Gaussian laser pulses"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    "black>=25.1.0",
-    "jupyter>=1.1.1",
     "matplotlib>=3.10.5",
-    "numpydoc>=1.9.0",
-    "qutip>=5.2.0",
-    "requests>=2.32.4",
-    "sphinx>=8.2.3",
-    "tqdm>=4.67.1",
+    "numpy>=2.3.1",
+    "qutip>=5.2.0,<6",
+    "scipy>=1.16",
+    "sympy>=1.14.0",
 ]
+
+[project.scripts]
+caipe-sim = "caipe_sim.app_main:main"
+
+[dependency-groups]
+dev = ["pytest>=8"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/caipe_sim"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+norecursedirs = ["archive", ".git", ".venv", "build", "dist"]
+
+[tool.hatch.build.targets.sdist]
+exclude = ["/archive"]
